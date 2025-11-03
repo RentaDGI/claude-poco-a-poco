@@ -18,9 +18,10 @@ const SHEETS_CONFIG = {
 
   // GIDs de las diferentes pestañas
   GID_JORNALES: '1885242510',      // Pestaña: Mis Jornales
+  GID_JORNALES_HISTORICO: '418043978',  // Pestaña: Jornales_historico (NUEVA)
   GID_CONTRATACION: '1304645770',  // Pestaña: Contrata_Glide
   GID_PUERTAS: '1650839211',       // Pestaña: Puertas (No se usa, getPuertas usa URL hardcodeada)
-  
+
   // URL de la hoja "censo_limpio"
   URL_CENSO_LIMPIO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcJ5Irxl93zwDqehuLW7-MsuVtphRDtmF8Rwp-yueqcAYRfgrTtEdKDwX8WKkJj1m0rVJc8AncGN_A/pub?gid=1216182924&single=true&output=csv'
 };
@@ -864,6 +865,77 @@ const SheetsAPI = {
     } catch (error) {
       console.error('Error obteniendo jornales:', error);
       // En caso de error, retornar array vacío en lugar de datos mock
+      return [];
+    }
+  },
+
+  /**
+   * [ROBUSTO] Obtiene jornales históricos desde la hoja Jornales_historico
+   * Columnas esperadas: Chapa, Fecha, Puesto, Jornada, Empresa, Buque, Parte, Logo_Empresa_URL
+   */
+  async getJornalesHistorico(chapa) {
+    try {
+      // Usa fetchSheetData, que es robusto y lee cabeceras
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_JORNALES_HISTORICO);
+
+      // Filtrar TODOS los registros por chapa
+      const jornalesChapa = data.filter(row => {
+        const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
+        return rowChapa === chapa.toString().trim();
+      }).map(row => ({
+        // Mapea usando los nombres de cabecera esperados
+        chapa: row.Chapa || row.chapa || '',
+        fecha: row.Fecha || row.fecha || '',
+        puesto: row.Puesto || row.puesto || '',
+        jornada: row.Jornada || row.jornada || '',
+        empresa: row.Empresa || row.empresa || '',
+        buque: row.Buque || row.buque || '',
+        parte: row.Parte || row.parte || '',
+        logo_empresa_url: row.Logo_Empresa_URL || row.logo_empresa_url || ''
+      })).filter(item => item.fecha); // Filtrar filas sin fecha
+
+      console.log(`Jornales históricos para chapa ${chapa}:`, jornalesChapa.length);
+      return jornalesChapa;
+
+    } catch (error) {
+      console.error('Error obteniendo jornales históricos:', error);
+      return [];
+    }
+  },
+
+  /**
+   * [ROBUSTO] Obtiene contrataciones desde la hoja contrata_glide
+   * Columnas esperadas: Fecha, Chapa, Puesto_Contratacion, Jornada, Empresa, Buque, Parte, Logo_Empresa_URL
+   */
+  async getContrataGlide(chapa = null) {
+    try {
+      // Usa fetchSheetData, que es robusto y lee cabeceras
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_CONTRATACION, false); // No usar cache para contrataciones
+
+      // Mapear todas las filas
+      const contrataciones = data.map(row => ({
+        fecha: row.Fecha || row.fecha || '',
+        chapa: (row.Chapa || row.chapa || '').toString().trim(),
+        puesto: row.Puesto_Contratacion || row.puesto_contratacion || row.Puesto || row.puesto || '',
+        jornada: row.Jornada || row.jornada || '',
+        empresa: row.Empresa || row.empresa || '',
+        buque: row.Buque || row.buque || '',
+        parte: row.Parte || row.parte || '',
+        logo_empresa_url: row.Logo_Empresa_URL || row.logo_empresa_url || ''
+      })).filter(item => item.fecha && item.chapa); // Filtrar filas sin fecha o chapa
+
+      // Filtrar por chapa si se proporciona
+      if (chapa) {
+        const filtered = contrataciones.filter(c => c.chapa === chapa.toString().trim());
+        console.log(`Contrataciones glide para chapa ${chapa}:`, filtered.length);
+        return filtered;
+      }
+
+      console.log('Total contrataciones glide:', contrataciones.length);
+      return contrataciones;
+
+    } catch (error) {
+      console.error('Error obteniendo contrataciones glide:', error);
       return [];
     }
   },
