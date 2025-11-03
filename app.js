@@ -843,12 +843,12 @@ async function loadContratacion() {
 
     // Mapeo de empresas a logos
     const empresaLogos = {
-      'APM': 'https://drive.google.com/uc?export=view&id=1x8XHm1TwzQVSkhZwRSMGl66n8jJTyFh4',
-      'CSP': 'https://drive.google.com/uc?export=view&id=1VWsDyIXyDYVyAPNOsE3Ml8RH9v8w1nX2',
-      'VTEU': 'https://drive.google.com/uc?export=view&id=1rJPH4Ly8eYb5VNRIfu5xYJJUHfykePPD',
-      'MSC': 'https://drive.google.com/uc?export=view&id=1J4VAwz2f4t9BSooNtak__cdwMVJKcmga',
-      'ERH': 'https://drive.google.com/uc?export=view&id=1Ol7TYg0jyji60zVc9TMr1DndeI2wE3c5',
-      'ERSHIP': 'https://drive.google.com/uc?export=view&id=1Ol7TYg0jyji60zVc9TMr1DndeI2wE3c5'
+      'APM': 'https://i.imgur.com/YBN8qZr.png',
+      'CSP': 'https://i.imgur.com/0kXq9wM.png',
+      'VTEU': 'https://i.imgur.com/3HJdL5f.png',
+      'MSC': 'https://i.imgur.com/mH5z8pL.png',
+      'ERH': 'https://i.imgur.com/7JqY9wK.png',
+      'ERSHIP': 'https://i.imgur.com/7JqY9wK.png'
     };
 
     // Función para obtener logo de empresa
@@ -1991,5 +1991,65 @@ function escapeHtml(text) {
 window.AppState = AppState;
 window.navigateTo = navigateTo;
 
+/**
+ * Función de utilidad para agregar contrataciones manualmente al histórico
+ * Uso desde consola del navegador:
+ *
+ * agregarContratacionesManual([
+ *   { chapa: '123', fecha: '2025-11-03', jornada: '14-20', puesto: 'Grúa', empresa: 'APM', buque: 'Buque 1', parte: '1', logo_empresa_url: '' },
+ *   { chapa: '456', fecha: '2025-11-03', jornada: '14-20', puesto: 'Capataz', empresa: 'MSC', buque: 'Buque 2', parte: '2', logo_empresa_url: '' }
+ * ])
+ */
+window.agregarContratacionesManual = function(contrataciones) {
+  if (!Array.isArray(contrataciones)) {
+    console.error('❌ Debes pasar un array de contrataciones');
+    console.log('Ejemplo de uso:');
+    console.log('agregarContratacionesManual([');
+    console.log('  { chapa: "123", fecha: "2025-11-03", jornada: "14-20", puesto: "Grúa", empresa: "APM", buque: "Buque 1", parte: "1", logo_empresa_url: "" }');
+    console.log('])');
+    return;
+  }
+
+  const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+  let agregadas = 0;
+
+  contrataciones.forEach(contratacion => {
+    // Verificar que tenga los campos requeridos
+    if (!contratacion.chapa || !contratacion.fecha || !contratacion.jornada) {
+      console.warn('⚠️ Contratación incompleta (falta chapa, fecha o jornada):', contratacion);
+      return;
+    }
+
+    // Verificar si ya existe (evitar duplicados)
+    const existe = historico.some(h =>
+      h.fecha === contratacion.fecha &&
+      h.jornada === contratacion.jornada &&
+      h.puesto === contratacion.puesto &&
+      h.chapa === contratacion.chapa
+    );
+
+    if (!existe) {
+      historico.push({
+        chapa: contratacion.chapa,
+        fecha: contratacion.fecha,
+        jornada: contratacion.jornada,
+        puesto: contratacion.puesto || '',
+        empresa: contratacion.empresa || '',
+        buque: contratacion.buque || '',
+        parte: contratacion.parte || '',
+        logo_empresa_url: contratacion.logo_empresa_url || ''
+      });
+      agregadas++;
+    } else {
+      console.log(`⏭️ Contratación duplicada ignorada: ${contratacion.chapa} - ${contratacion.fecha} - ${contratacion.jornada}`);
+    }
+  });
+
+  localStorage.setItem('jornales_historico', JSON.stringify(historico));
+  console.log(`✅ Agregadas ${agregadas} contrataciones nuevas`);
+  console.log(`📊 Total en histórico: ${historico.length} jornales`);
+
+  return { agregadas, total: historico.length };
+};
 
 

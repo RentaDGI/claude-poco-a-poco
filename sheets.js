@@ -720,10 +720,10 @@ const SheetsAPI = {
 
       // Si no está configurada en localStorage, usar la URL por defecto
       if (!appsScriptURL || appsScriptURL === '' || appsScriptURL === 'null') {
-        appsScriptURL = 'https://script.google.com/macros/s/AKfycbwL1lFFIbpq4evkRQ6W7MTfF6ywWgWaNad6mphwLHRbGkrbSXlB4eUOm-oaB50dcDnQ8g/exec';
+        appsScriptURL = 'https://script.google.com/macros/s/AKfycby7Cj08EDdVHXlzb1BKUXg0G5Zc_FuOMTp672U9_2K9tzgVy5p6q_sj4G8ctvHjR58hxg/exec';
         // Guardar en localStorage para futuros usos
         localStorage.setItem('foro_apps_script_url', appsScriptURL);
-        console.log('✅ URL del Apps Script del foro configurada automáticamente');
+        console.log('✅ URL del Apps Script configurada automáticamente');
       }
 
       const response = await fetch(appsScriptURL, {
@@ -759,7 +759,7 @@ const SheetsAPI = {
       let appsScriptURL = localStorage.getItem('foro_apps_script_url');
 
       if (!appsScriptURL || appsScriptURL === '' || appsScriptURL === 'null') {
-        appsScriptURL = 'https://script.google.com/macros/s/AKfycbwL1lFFIbpq4evkRQ6W7MTfF6ywWgWaNad6mphwLHRbGkrbSXlB4eUOm-oaB50dcDnQ8g/exec';
+        appsScriptURL = 'https://script.google.com/macros/s/AKfycby7Cj08EDdVHXlzb1BKUXg0G5Zc_FuOMTp672U9_2K9tzgVy5p6q_sj4G8ctvHjR58hxg/exec';
       }
 
       console.log('🔐 Enviando cambio de contraseña a Apps Script...');
@@ -795,7 +795,7 @@ const SheetsAPI = {
       let appsScriptURL = localStorage.getItem('foro_apps_script_url');
 
       if (!appsScriptURL || appsScriptURL === '' || appsScriptURL === 'null') {
-        appsScriptURL = 'https://script.google.com/macros/s/AKfycbwL1lFFIbpq4evkRQ6W7MTfF6ywWgWaNad6mphwLHRbGkrbSXlB4eUOm-oaB50dcDnQ8g/exec';
+        appsScriptURL = 'https://script.google.com/macros/s/AKfycby7Cj08EDdVHXlzb1BKUXg0G5Zc_FuOMTp672U9_2K9tzgVy5p6q_sj4G8ctvHjR58hxg/exec';
       }
 
       console.log(`📤 Sincronizando ${jornales.length} jornales al backup...`);
