@@ -19,6 +19,7 @@ const SHEETS_CONFIG = {
   // GIDs de las diferentes pestañas
   GID_JORNALES: '1885242510',      // Pestaña: Mis Jornales
   GID_JORNALES_HISTORICO: '418043978',  // Pestaña: Jornales_historico (NUEVA)
+  GID_JORNALES_HISTORICO_ACUMULADO: '1604874350',  // Pestaña: Jornales_Historico_Acumulado (HISTÓRICO ROBUSTO)
   GID_CONTRATACION: '1304645770',  // Pestaña: Contrata_Glide
   GID_PUERTAS: '1650839211',       // Pestaña: Puertas (No se usa, getPuertas usa URL hardcodeada)
 
@@ -1041,6 +1042,41 @@ const SheetsAPI = {
 
     } catch (error) {
       console.error('Error obteniendo contrataciones glide:', error);
+      return [];
+    }
+  },
+
+  /**
+   * [ROBUSTO] Obtiene jornales desde el histórico acumulado (Jornales_Historico_Acumulado)
+   * Esta pestaña se alimenta automáticamente cada hora desde contrata_glide vía Apps Script
+   * Columnas: Fecha, Chapa, Puesto_Contratacion, Jornada, Empresa, Buque, Parte, Logo_Empresa_URL, Timestamp_Guardado
+   */
+  async getJornalesHistoricoAcumulado(chapa) {
+    try {
+      // Usa fetchSheetData, robusto y lee cabeceras
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_JORNALES_HISTORICO_ACUMULADO, false); // No cache
+
+      // Filtrar por chapa y mapear
+      const jornalesChapa = data.filter(row => {
+        const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
+        return rowChapa === chapa.toString().trim();
+      }).map(row => ({
+        chapa: row.Chapa || row.chapa || '',
+        fecha: row.Fecha || row.fecha || '',
+        puesto: row.Puesto_Contratacion || row.puesto_contratacion || row.Puesto || row.puesto || '',
+        jornada: row.Jornada || row.jornada || '',
+        empresa: row.Empresa || row.empresa || '',
+        buque: row.Buque || row.buque || '',
+        parte: row.Parte || row.parte || '',
+        logo_empresa_url: row.Logo_Empresa_URL || row.logo_empresa_url || '',
+        timestamp_guardado: row.Timestamp_Guardado || row.timestamp_guardado || ''
+      })).filter(item => item.fecha && item.jornada); // Filtrar filas sin fecha o jornada
+
+      console.log(`✅ Jornales históricos acumulados para chapa ${chapa}:`, jornalesChapa.length);
+      return jornalesChapa;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo jornales históricos acumulados:', error);
       return [];
     }
   },

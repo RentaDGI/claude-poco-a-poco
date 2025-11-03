@@ -1008,18 +1008,18 @@ async function loadJornales() {
   try {
     let data = [];
 
-    // 1. INTENTAR CARGAR DESDE GOOGLE SHEETS (Jornales_Historico)
-    console.log('📥 Intentando cargar jornales desde Google Sheets...');
+    // 1. INTENTAR CARGAR DESDE JORNALES_HISTORICO_ACUMULADO (se actualiza automáticamente cada hora)
+    console.log('📥 Cargando jornales desde Jornales_Historico_Acumulado...');
     try {
-      const jornalesBackup = await SheetsAPI.obtenerJornalesBackup(AppState.currentUser);
+      const jornalesAcumulados = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
 
-      if (jornalesBackup && jornalesBackup.length > 0) {
-        console.log(`✅ Cargados ${jornalesBackup.length} jornales desde Google Sheets`);
-        data = jornalesBackup;
+      if (jornalesAcumulados && jornalesAcumulados.length > 0) {
+        console.log(`✅ Cargados ${jornalesAcumulados.length} jornales desde histórico acumulado`);
+        data = jornalesAcumulados;
 
-        // Guardar en localStorage como caché
+        // Guardar en localStorage como caché por si falla la conexión en el futuro
         const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
-        jornalesBackup.forEach(jornal => {
+        jornalesAcumulados.forEach(jornal => {
           const existe = historico.some(h =>
             h.fecha === jornal.fecha &&
             h.jornada === jornal.jornada &&
@@ -1032,10 +1032,10 @@ async function loadJornales() {
         });
         localStorage.setItem('jornales_historico', JSON.stringify(historico));
       } else {
-        throw new Error('No hay jornales en Google Sheets, usando localStorage');
+        throw new Error('No hay jornales en histórico acumulado, usando localStorage');
       }
     } catch (error) {
-      console.warn('⚠️ No se pudo cargar desde Google Sheets:', error.message);
+      console.warn('⚠️ No se pudo cargar desde histórico acumulado:', error.message);
       console.log('📂 Cargando desde localStorage como fallback...');
 
       // 2. FALLBACK: CARGAR DESDE LOCALSTORAGE
