@@ -574,14 +574,14 @@ async function handlePasswordChange() {
       const result = await SheetsAPI.cambiarContrasenaAppsScript(chapa, newPassword);
       if (result.success) {
         console.log('✅ Contraseña actualizada en Google Sheets');
-        successMsg.textContent = '¡Contraseña cambiada exitosamente en Google Sheets!';
+        successMsg.textContent = '¡Contraseña cambiada exitosamente!';
       } else {
         console.warn('⚠️ No se pudo actualizar en Google Sheets, pero se guardó localmente');
-        successMsg.textContent = '¡Contraseña cambiada localmente! (Google Sheets no disponible)';
+        successMsg.textContent = '¡Contraseña cambiada exitosamente!';
       }
     } catch (error) {
       console.error('Error actualizando en Google Sheets:', error);
-      successMsg.textContent = '¡Contraseña cambiada localmente! (Google Sheets no disponible)';
+      successMsg.textContent = '¡Contraseña cambiada exitosamente!';
     }
 
     successMsg.classList.add('active');
@@ -843,12 +843,12 @@ async function loadContratacion() {
 
     // Mapeo de empresas a logos
     const empresaLogos = {
-      'APM': 'https://i.imgur.com/YBN8qZr.png',
-      'CSP': 'https://i.imgur.com/0kXq9wM.png',
-      'VTEU': 'https://i.imgur.com/3HJdL5f.png',
-      'MSC': 'https://i.imgur.com/mH5z8pL.png',
-      'ERH': 'https://i.imgur.com/7JqY9wK.png',
-      'ERSHIP': 'https://i.imgur.com/7JqY9wK.png'
+      'APM': 'https://i.imgur.com/HgQ95qc.jpeg',
+      'CSP': 'https://i.imgur.com/8Tjx3KP.jpeg',
+      'VTEU': 'https://i.imgur.com/3nNCkw5.jpeg',
+      'MSC': 'https://i.imgur.com/kX4Ujxf.jpeg',
+      'ERH': 'https://i.imgur.com/OHDp62K.png',
+      'ERSHIP': 'https://i.imgur.com/OHDp62K.png'
     };
 
     // Función para obtener logo de empresa
