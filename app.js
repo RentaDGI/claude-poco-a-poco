@@ -674,12 +674,10 @@ function closeSidebar() {
  * Carga la página de contratación
  */
 /**
- * Carga la página de contratación - VERSIÓN CORREGIDA
- * Muestra TODAS las contrataciones de las últimas 2 semanas, agrupadas por fecha
- */
-/**
- * Carga la página de contrataciones desde contrata_glide
- * ACTUALIZADO: Lee directamente de contrata_glide con lógica de horario hasta las 07:00
+ * Carga la página de contratación
+ * ACTUALIZADO: Muestra contrataciones hasta las 00:00 (medianoche) del día
+ * - Jornada 02-08: se muestra hasta medianoche del día de la jornada (se contrata el día anterior)
+ * - Otras jornadas: se muestran hasta medianoche del día de la contratación
  */
 async function loadContratacion() {
   const container = document.getElementById('contratacion-content');
@@ -691,17 +689,16 @@ async function loadContratacion() {
   container.innerHTML = '';
 
   try {
-    // Obtener todas las contrataciones desde contrata_glide
-    const allData = await SheetsAPI.getContrataGlide(AppState.currentUser);
+    // Obtener todas las contrataciones desde la URL pivotada (funciona bien)
+    const allData = await SheetsAPI.getContrataciones(AppState.currentUser);
 
-    // LÓGICA DE HORARIO: Filtrar según la hora actual
+    // LÓGICA DE HORARIO: Mostrar hasta las 00:00 (medianoche)
     const ahora = new Date();
-    const horaActual = ahora.getHours();
 
-    // Obtener fechas relevantes
+    // Obtener fechas relevantes (sin hora, solo fecha)
     const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    const ayer = new Date(hoy);
-    ayer.setDate(ayer.getDate() - 1);
+    const manana = new Date(hoy);
+    manana.setDate(manana.getDate() + 1);
 
     // Formatear fechas para comparación (dd/mm/yyyy)
     const formatFecha = (fecha) => {
@@ -712,34 +709,54 @@ async function loadContratacion() {
     };
 
     const fechaHoy = formatFecha(hoy);
-    const fechaAyer = formatFecha(ayer);
+    const fechaManana = formatFecha(manana);
 
-    console.log('Hora actual:', horaActual);
     console.log('Fecha hoy:', fechaHoy);
-    console.log('Fecha ayer:', fechaAyer);
+    console.log('Fecha mañana:', fechaManana);
 
-    let data;
-    if (horaActual < 7) {
-      // Antes de las 07:00 - Mostrar contrataciones del día anterior Y del día actual (jornada 02-08)
-      data = allData.filter(item => {
-        // Contrataciones del día anterior (todas las jornadas)
-        if (item.fecha === fechaAyer) return true;
+    // Filtrar contrataciones según la lógica:
+    // - Jornada 02-08 con fecha de mañana: mostrar hoy (se contrató ayer para mañana)
+    // - Cualquier jornada con fecha de hoy: mostrar hoy
+    const data = allData.filter(item => {
+      // Jornada 02-08 se contrata el día anterior, así que si la fecha es mañana, se muestra hoy
+      if (item.jornada === '02-08' && item.fecha === fechaManana) {
+        return true;
+      }
 
-        // Contrataciones del día actual solo jornada 02-08
-        if (item.fecha === fechaHoy && item.jornada === '02-08') return true;
+      // Todas las jornadas con fecha de hoy se muestran
+      if (item.fecha === fechaHoy) {
+        return true;
+      }
 
-        return false;
+      return false;
+    });
+
+    console.log(`Mostrando ${data.length} contrataciones hasta medianoche`);
+
+    // Guardar TODAS las contrataciones obtenidas en el histórico de jornales
+    if (allData.length > 0) {
+      const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+
+      // Agregar solo las nuevas (evitar duplicados)
+      allData.forEach(nueva => {
+        const existe = historico.some(h =>
+          h.fecha === nueva.fecha &&
+          h.jornada === nueva.jornada &&
+          h.puesto === nueva.puesto &&
+          h.chapa === nueva.chapa
+        );
+        if (!existe) {
+          historico.push(nueva);
+        }
       });
-      console.log('Antes de las 07:00 - Mostrando contrataciones del día anterior y jornada 02-08 de hoy');
-    } else {
-      // Después de las 07:00 - Solo mostrar contrataciones del día actual
-      data = allData.filter(item => item.fecha === fechaHoy);
-      console.log('Después de las 07:00 - Mostrando solo contrataciones de hoy');
+
+      localStorage.setItem('jornales_historico', JSON.stringify(historico));
+      console.log(`Guardadas ${historico.length} jornales en el histórico`);
     }
 
     // Ordenar por fecha y jornada
     const sortedData = data.sort((a, b) => {
-      // Primero por fecha
+      // Primero por fecha descendente
       const dateA = new Date(a.fecha.split('/').reverse().join('-'));
       const dateB = new Date(b.fecha.split('/').reverse().join('-'));
       if (dateB.getTime() !== dateA.getTime()) {
@@ -759,13 +776,13 @@ async function loadContratacion() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h3>No hay asignaciones actuales</h3>
-          <p>No tienes contrataciones asignadas para mostrar.</p>
+          <p>No tienes contrataciones asignadas para hoy.</p>
         </div>
       `;
       return;
     }
 
-    // Mapeo de empresas a logos (fallback si no viene en la hoja)
+    // Mapeo de empresas a logos
     const empresaLogos = {
       'APM': 'https://lh3.googleusercontent.com/d/1x8XHm1TwzQVSkhZwRSMGl66n8jJTyFh4',
       'CSP': 'https://lh3.googleusercontent.com/d/1VWsDyIXyDYVyAPNOsE3Ml8RH9v8w1nX2',
@@ -775,14 +792,9 @@ async function loadContratacion() {
       'ERSHIP': 'https://lh3.googleusercontent.com/d/1Ol7TYg0jyji60zVc9TMr1DndeI2wE3c5'
     };
 
-    // Función para obtener logo de empresa (prioriza el de la hoja)
-    const getEmpresaLogo = (item) => {
-      // Primero intentar usar el logo de la hoja
-      if (item.logo_empresa_url && item.logo_empresa_url.trim() !== '') {
-        return item.logo_empresa_url.trim();
-      }
-      // Fallback al mapeo hardcodeado
-      const empresaUpper = item.empresa.toUpperCase().trim();
+    // Función para obtener logo de empresa
+    const getEmpresaLogo = (empresa) => {
+      const empresaUpper = empresa.toUpperCase().trim();
       return empresaLogos[empresaUpper] || null;
     };
 
@@ -825,7 +837,7 @@ async function loadContratacion() {
       cardsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
 
       contratacionesFecha.forEach(row => {
-        const logo = getEmpresaLogo(row);
+        const logo = getEmpresaLogo(row.empresa);
 
         const card = document.createElement('div');
         card.className = 'contratacion-card';
@@ -918,7 +930,7 @@ async function loadContratacion() {
 /**
  * Carga la página de jornales - Sistema de Quincenas
  * Agrupa jornales por períodos quincenales (1-15, 16-fin de mes)
- * ACTUALIZADO: Ahora lee directamente de la hoja Jornales_historico en Google Sheets
+ * ACTUALIZADO: Usa localStorage con limpieza automática el 31 de diciembre a las 00:00
  */
 async function loadJornales() {
   const statsContainer = document.getElementById('jornales-stats');
@@ -932,8 +944,29 @@ async function loadJornales() {
   statsContainer.innerHTML = '';
 
   try {
-    // Obtener jornales directamente desde la hoja Jornales_historico
-    const data = await SheetsAPI.getJornalesHistorico(AppState.currentUser);
+    // Obtener jornales del histórico almacenado en localStorage
+    let historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+
+    // LIMPIEZA AUTOMÁTICA: Eliminar jornales del año anterior si es 31 de diciembre o posterior
+    const ahora = new Date();
+    const añoActual = ahora.getFullYear();
+
+    // Filtrar solo jornales del año actual
+    historico = historico.filter(jornal => {
+      try {
+        const fechaParts = jornal.fecha.split('/');
+        const añoJornal = parseInt(fechaParts[2]);
+        return añoJornal === añoActual;
+      } catch {
+        return true; // Si hay error parseando, mantener el jornal
+      }
+    });
+
+    // Guardar el histórico limpio de vuelta
+    localStorage.setItem('jornales_historico', JSON.stringify(historico));
+
+    // Filtrar solo los jornales del usuario actual
+    const data = historico.filter(item => item.chapa === AppState.currentUser);
 
     loading.classList.add('hidden');
 
