@@ -750,6 +750,111 @@ const SheetsAPI = {
   },
 
   /**
+   * Cambia la contraseña de un usuario vía Apps Script
+   * Esto actualiza el Google Sheet directamente
+   */
+  async cambiarContrasenaAppsScript(chapa, nuevaContrasena) {
+    try {
+      // URL del Google Apps Script Web App
+      let appsScriptURL = localStorage.getItem('foro_apps_script_url');
+
+      if (!appsScriptURL || appsScriptURL === '' || appsScriptURL === 'null') {
+        appsScriptURL = 'https://script.google.com/macros/s/AKfycbwL1lFFIbpq4evkRQ6W7MTfF6ywWgWaNad6mphwLHRbGkrbSXlB4eUOm-oaB50dcDnQ8g/exec';
+      }
+
+      console.log('🔐 Enviando cambio de contraseña a Apps Script...');
+
+      const response = await fetch(appsScriptURL, {
+        method: 'POST',
+        mode: 'no-cors', // Apps Script requiere no-cors
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'changePassword',
+          chapa: chapa,
+          newPassword: nuevaContrasena
+        })
+      });
+
+      console.log('✅ Contraseña actualizada en Google Sheets vía Apps Script');
+      return { success: true };
+
+    } catch (error) {
+      console.error('Error cambiando contraseña en Apps Script:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Sincroniza jornales al backup en Google Sheets
+   * Envía todos los jornales de un usuario para guardarlos en Jornales_Historico
+   */
+  async sincronizarJornalesBackup(chapa, jornales) {
+    try {
+      let appsScriptURL = localStorage.getItem('foro_apps_script_url');
+
+      if (!appsScriptURL || appsScriptURL === '' || appsScriptURL === 'null') {
+        appsScriptURL = 'https://script.google.com/macros/s/AKfycbwL1lFFIbpq4evkRQ6W7MTfF6ywWgWaNad6mphwLHRbGkrbSXlB4eUOm-oaB50dcDnQ8g/exec';
+      }
+
+      console.log(`📤 Sincronizando ${jornales.length} jornales al backup...`);
+
+      await fetch(appsScriptURL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'sincronizarJornales',
+          chapa: chapa,
+          jornales: jornales
+        })
+      });
+
+      console.log('✅ Jornales sincronizados al backup en Google Sheets');
+      return { success: true };
+
+    } catch (error) {
+      console.error('Error sincronizando jornales:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Obtiene los jornales del backup en Google Sheets
+   * Lee desde la pestaña Jornales_Historico
+   */
+  async obtenerJornalesBackup(chapa) {
+    try {
+      // Usar la misma función que getJornalesHistorico
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_JORNALES_HISTORICO);
+
+      // Filtrar por chapa
+      const jornalesChapa = data.filter(row => {
+        const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
+        return rowChapa === chapa.toString().trim();
+      }).map(row => ({
+        chapa: row.Chapa || row.chapa || '',
+        fecha: row.Fecha || row.fecha || '',
+        puesto: row.Puesto || row.puesto || row.Puesto_Contratacion || row.puesto_contratacion || '',
+        jornada: row.Jornada || row.jornada || '',
+        empresa: row.Empresa || row.empresa || '',
+        buque: row.Buque || row.buque || '',
+        parte: row.Parte || row.parte || ''
+      })).filter(item => item.fecha);
+
+      console.log(`📥 Obtenidos ${jornalesChapa.length} jornales del backup`);
+      return jornalesChapa;
+
+    } catch (error) {
+      console.error('Error obteniendo jornales del backup:', error);
+      return [];
+    }
+  },
+
+  /**
    * [FRÁGIL] Obtiene usuarios desde Google Sheet para validación de login
    */
   async getUsuarios() {
