@@ -711,27 +711,40 @@ async function loadContratacion() {
     const fechaHoy = formatFecha(hoy);
     const fechaManana = formatFecha(manana);
 
+    console.log('=== DEBUG CONTRATACIONES ===');
     console.log('Fecha hoy:', fechaHoy);
     console.log('Fecha mañana:', fechaManana);
+    console.log('Total contrataciones obtenidas:', allData.length);
+
+    // Normalizar formato de jornada (eliminar espacios, convertir a minúsculas)
+    const normalizeJornada = (jornada) => {
+      if (!jornada) return '';
+      return jornada.toString().toLowerCase().replace(/\s+/g, '').replace(/a/g, '-');
+    };
 
     // Filtrar contrataciones según la lógica:
-    // - Jornada 02-08 con fecha de mañana: mostrar hoy (se contrató ayer para mañana)
+    // - Jornada 02-08 con fecha de mañana: mostrar hoy (se contrató hoy para mañana, se ve hasta medianoche de mañana)
     // - Cualquier jornada con fecha de hoy: mostrar hoy
     const data = allData.filter(item => {
-      // Jornada 02-08 se contrata el día anterior, así que si la fecha es mañana, se muestra hoy
-      if (item.jornada === '02-08' && item.fecha === fechaManana) {
+      const jornadaNorm = normalizeJornada(item.jornada);
+
+      // Jornada 02-08 se contrata el día anterior (hoy), pero tiene fecha de mañana
+      // Debe mostrarse desde HOY (cuando se contrata) hasta las 00:00 de MAÑANA
+      if (jornadaNorm === '02-08' && item.fecha === fechaManana) {
+        console.log(`✓ Mostrando jornada 02-08 para chapa ${item.chapa} (fecha: ${item.fecha})`);
         return true;
       }
 
       // Todas las jornadas con fecha de hoy se muestran
       if (item.fecha === fechaHoy) {
+        console.log(`✓ Mostrando jornada ${item.jornada} para chapa ${item.chapa} (fecha: ${item.fecha})`);
         return true;
       }
 
       return false;
     });
 
-    console.log(`Mostrando ${data.length} contrataciones hasta medianoche`);
+    console.log(`Total contrataciones a mostrar: ${data.length}`);
 
     // Guardar TODAS las contrataciones obtenidas en el histórico de jornales
     if (allData.length > 0) {
@@ -1732,10 +1745,31 @@ function renderForoMessages(messages) {
  */
 async function sendForoMessage() {
   const input = document.getElementById('foro-input');
-  if (!input) return;
+  const sendBtn = document.getElementById('foro-send');
+
+  if (!input || !sendBtn) return;
 
   const texto = input.value.trim();
   if (!texto) return;
+
+  // Prevenir múltiples envíos
+  if (sendBtn.disabled) return;
+
+  // Deshabilitar controles y mostrar feedback visual
+  input.disabled = true;
+  sendBtn.disabled = true;
+
+  // Guardar el contenido original del botón
+  const originalBtnHTML = sendBtn.innerHTML;
+
+  // Mostrar indicador de carga
+  sendBtn.innerHTML = `
+    <svg style="width: 20px; height: 20px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <span style="margin-left: 8px;">Enviando...</span>
+  `;
 
   const newMessage = {
     id: Date.now(),
@@ -1750,6 +1784,18 @@ async function sendForoMessage() {
 
     if (sentToCloud) {
       console.log('Mensaje enviado a Google Sheets');
+
+      // Mostrar mensaje de éxito
+      sendBtn.innerHTML = `
+        <svg style="width: 20px; height: 20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span style="margin-left: 8px;">Enviado</span>
+      `;
+
+      // Limpiar input
+      input.value = '';
+
       // Esperar un poco y recargar para mostrar el mensaje
       setTimeout(async () => {
         await loadForo();
@@ -1757,6 +1803,12 @@ async function sendForoMessage() {
         if (container) {
           container.scrollTop = container.scrollHeight;
         }
+
+        // Restaurar botón
+        sendBtn.innerHTML = originalBtnHTML;
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
       }, 1000);
     } else {
       // Fallback a localStorage
@@ -1771,6 +1823,13 @@ async function sendForoMessage() {
       if (container) {
         container.scrollTop = container.scrollHeight;
       }
+
+      // Limpiar y restaurar
+      input.value = '';
+      sendBtn.innerHTML = originalBtnHTML;
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
     }
   } catch (error) {
     console.error('Error enviando mensaje:', error);
@@ -1785,9 +1844,27 @@ async function sendForoMessage() {
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
-  }
 
-  input.value = '';
+    // Limpiar y restaurar
+    input.value = '';
+    sendBtn.innerHTML = originalBtnHTML;
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// Agregar estilo de animación spin si no existe
+if (!document.getElementById('spin-animation-style')) {
+  const style = document.createElement('style');
+  style.id = 'spin-animation-style';
+  style.textContent = `
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 /**
