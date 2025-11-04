@@ -424,6 +424,14 @@
     </div>
   </div>
 
+  <!-- Botón de instalación PWA flotante -->
+  <button id="install-pwa-btn" class="install-pwa-btn" aria-label="Instalar aplicación">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+    Instalar App
+  </button>
+
   <!-- Scripts -->
   <script src="sheets.js"></script>
   <script src="app.js"></script>
@@ -469,29 +477,62 @@
       });
     }
 
-    // Detectar modo instalación PWA
+    // Detectar modo instalación PWA y mostrar botón personalizado
     let deferredPrompt;
+    const installBtn = document.getElementById('install-pwa-btn');
+
     window.addEventListener('beforeinstallprompt', (e) => {
       // Prevenir el prompt automático
       e.preventDefault();
       deferredPrompt = e;
 
-      // Opcional: Mostrar un banner personalizado para instalar la app
-      console.log('💡 La app puede ser instalada');
-
-      // Aquí podrías mostrar un botón personalizado de instalación
-      // Por ahora solo lo mostramos en consola
+      // Mostrar botón de instalación personalizado
+      console.log('💡 La app puede ser instalada - mostrando botón');
+      if (installBtn) {
+        installBtn.classList.add('visible');
+      }
     });
+
+    // Manejar clic en el botón de instalación
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+          console.log('⚠️ No hay prompt de instalación disponible');
+          // En iOS Safari, mostrar instrucciones
+          if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+            alert('Para instalar en iOS:\n\n1. Toca el botón Compartir (📤)\n2. Desplázate y toca "Agregar a pantalla de inicio"\n3. Toca "Agregar"');
+          }
+          return;
+        }
+
+        // Mostrar el prompt nativo de instalación
+        deferredPrompt.prompt();
+
+        // Esperar la respuesta del usuario
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`👤 Usuario ${outcome === 'accepted' ? 'aceptó' : 'rechazó'} la instalación`);
+
+        // Ocultar botón después de mostrar el prompt
+        installBtn.classList.remove('visible');
+        deferredPrompt = null;
+      });
+    }
 
     // Detectar si la app fue instalada
     window.addEventListener('appinstalled', () => {
       console.log('✅ ¡App instalada exitosamente!');
+      if (installBtn) {
+        installBtn.classList.remove('visible');
+      }
       deferredPrompt = null;
     });
 
-    // Detectar modo standalone (app instalada)
+    // Detectar modo standalone (app ya instalada) - ocultar botón
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
       console.log('📱 App ejecutándose en modo instalado');
+      if (installBtn) {
+        installBtn.style.display = 'none';
+      }
     }
   </script>
 </body>
