@@ -50,6 +50,7 @@ const ENLACES_DATA = [
 
 // Noticias y avisos - Añadir contenido real aquí
 const NOTICIAS_DATA = [
+  { 
   titulo: '⚙️ Actualización: Sistema de Contratación más Robusto',
     fecha: '04/11/2025',
     contenido: `Se ha implementado un sistema robusto para **garantizar la visibilidad de tus asignaciones**, incluso si el sistema principal falla:
@@ -2117,6 +2118,7 @@ window.agregarContratacionesManual = function(contrataciones) {
 
   return { agregadas, total: historico.length };
 };
+
 
 
 
