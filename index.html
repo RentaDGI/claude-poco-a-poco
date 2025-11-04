@@ -4,6 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Estiba VLC - Puerto de Valencia</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="Portal para trabajadores del Puerto de Valencia - Consulta tus jornales, contrataciones y puertas">
+  <meta name="theme-color" content="#0a2e5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Estiba VLC">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/jpeg" href="https://i.imgur.com/7F1BWQ2.jpeg">
+  <link rel="apple-touch-icon" href="https://i.imgur.com/7F1BWQ2.jpeg">
+
+  <!-- Stylesheets -->
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -410,5 +426,72 @@
   <!-- Scripts -->
   <script src="sheets.js"></script>
   <script src="app.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    // Registrar el Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('✅ Service Worker registrado:', registration.scope);
+
+            // Verificar actualizaciones
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              console.log('🔄 Nueva versión de Service Worker encontrada');
+
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Nueva versión disponible, ofrecer recargar
+                  console.log('🆕 Nueva versión disponible');
+                  if (confirm('Hay una nueva versión de la app disponible. ¿Deseas actualizar ahora?')) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    window.location.reload();
+                  }
+                }
+              });
+            });
+          })
+          .catch(error => {
+            console.warn('❌ Error registrando Service Worker:', error);
+          });
+
+        // Detectar cuando el Service Worker se actualiza
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          console.log('🔄 Service Worker actualizado, recargando...');
+          window.location.reload();
+        });
+      });
+    }
+
+    // Detectar modo instalación PWA
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevenir el prompt automático
+      e.preventDefault();
+      deferredPrompt = e;
+
+      // Opcional: Mostrar un banner personalizado para instalar la app
+      console.log('💡 La app puede ser instalada');
+
+      // Aquí podrías mostrar un botón personalizado de instalación
+      // Por ahora solo lo mostramos en consola
+    });
+
+    // Detectar si la app fue instalada
+    window.addEventListener('appinstalled', () => {
+      console.log('✅ ¡App instalada exitosamente!');
+      deferredPrompt = null;
+    });
+
+    // Detectar modo standalone (app instalada)
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      console.log('📱 App ejecutándose en modo instalado');
+    }
+  </script>
 </body>
 </html>

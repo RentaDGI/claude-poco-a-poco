@@ -127,7 +127,7 @@ async function initializeApp() {
   if (storedChapa) {
     // Obtener nombre do del sheet
     const nombre = await SheetsAPI.getNombrePorChapa(storedChapa);
-    loginUser(storedChapa, nombre);
+    await loginUser(storedChapa, nombre);
   } else {
     showPage('login');
   }
@@ -315,7 +315,7 @@ async function handleLogin() {
 
     if (passwordValida) {
       // Login exitoso - guardar chapa y nombre
-      loginUser(chapa, usuario.nombre || `Chapa ${chapa}`);
+      await loginUser(chapa, usuario.nombre || `Chapa ${chapa}`);
     } else {
       throw new Error('Contraseña incorrecta');
     }
@@ -340,7 +340,7 @@ async function handleLogin() {
 /**
  * Inicia sesión de usuario
  */
-function loginUser(chapa, nombre = null) {
+async function loginUser(chapa, nombre = null) {
   AppState.currentUser = chapa;
   AppState.currentUserName = nombre || `Chapa ${chapa}`;
   AppState.isAuthenticated = true;
@@ -349,10 +349,17 @@ function loginUser(chapa, nombre = null) {
   localStorage.setItem('currentChapa', chapa);
   localStorage.setItem('currentUserName', AppState.currentUserName);
 
-  // r cache de usuarios para el foro
-  const usuariosCache = JSON.parse(localStorage.getItem('usuarios_cache') || '{}');
-  usuariosCache[chapa] = AppState.currentUserName;
-  localStorage.setItem('usuarios_cache', JSON.stringify(usuariosCache));
+  // Actualizar cache de usuarios para el foro (obtener todos los nombres desde Google Sheets)
+  try {
+    await actualizarCacheNombres();
+    console.log('✅ Cache de nombres actualizado en login');
+  } catch (error) {
+    console.warn('⚠️ No se pudo actualizar cache de nombres:', error);
+    // Fallback: al menos guardar el usuario actual
+    const usuariosCache = JSON.parse(localStorage.getItem('usuarios_cache') || '{}');
+    usuariosCache[chapa] = AppState.currentUserName;
+    localStorage.setItem('usuarios_cache', JSON.stringify(usuariosCache));
+  }
 
   // r UI
   updateUIForAuthenticatedUser();

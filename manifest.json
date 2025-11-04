@@ -1,0 +1,52 @@
+{
+  "name": "Portal Estiba VLC - Puerto de Valencia",
+  "short_name": "Estiba VLC",
+  "description": "Portal para trabajadores del Puerto de Valencia - Consulta tus jornales, contrataciones y puertas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a2e5c",
+  "theme_color": "#0a2e5c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://i.imgur.com/7F1BWQ2.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.imgur.com/7F1BWQ2.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "es-ES",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Mis Jornales",
+      "short_name": "Jornales",
+      "description": "Ver mis jornales históricos",
+      "url": "/#jornales",
+      "icons": [{ "src": "https://i.imgur.com/7F1BWQ2.jpeg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Mi Contratación",
+      "short_name": "Contratación",
+      "description": "Ver mi contratación actual",
+      "url": "/#contratacion",
+      "icons": [{ "src": "https://i.imgur.com/7F1BWQ2.jpeg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Puertas",
+      "short_name": "Puertas",
+      "description": "Ver puertas actuales",
+      "url": "/#puertas",
+      "icons": [{ "src": "https://i.imgur.com/7F1BWQ2.jpeg", "sizes": "96x96" }]
+    }
+  ]
+}
