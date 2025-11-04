@@ -110,7 +110,7 @@ const NOTICIAS_DATA = [
     titulo: '📢 Actualización del Sistema (Jornales)',
     fecha: '01/11/2025',
     contenido: 'Se ha mejorado el sistema de jornales. Ahora puedes exportar a CSV y ver tus jornales organizados por quincenas.'
-  },
+  }
 
 ];
 
@@ -2118,6 +2118,7 @@ window.agregarContratacionesManual = function(contrataciones) {
 
   return { agregadas, total: historico.length };
 };
+
 
 
 
