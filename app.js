@@ -1806,11 +1806,24 @@ function renderForoMessages(messages) {
   const usuariosCache = JSON.parse(localStorage.getItem('usuarios_cache') || '{}');
 
   sorted.forEach(msg => {
-    const isOwn = msg.chapa === AppState.currentUser;
+    // Normalizar chapa (quitar "0" inicial si es de 5 dígitos: 80983 → 983)
+    let chapaOriginal = msg.chapa.toString();
+    let chapaNormalizada = chapaOriginal;
+
+    // Si la chapa empieza con "0" o "80" y tiene más de 3 dígitos, normalizarla
+    if (chapaOriginal.length >= 4 && chapaOriginal.startsWith('80')) {
+      // 80983 → 983, 80784 → 784, etc.
+      chapaNormalizada = chapaOriginal.substring(2);
+    } else if (chapaOriginal.length >= 4 && chapaOriginal.startsWith('0')) {
+      // 0983 → 983, 0784 → 784, etc.
+      chapaNormalizada = chapaOriginal.substring(1);
+    }
+
+    const isOwn = chapaNormalizada === AppState.currentUser;
     const timeAgo = getTimeAgo(new Date(msg.timestamp));
 
-    // Obtener nombre del usuario (del cache o fallback a chapa)
-    const nombreUsuario = usuariosCache[msg.chapa] || `Chapa ${msg.chapa}`;
+    // Obtener nombre del usuario (del cache usando chapa normalizada o fallback a chapa normalizada)
+    const nombreUsuario = usuariosCache[chapaNormalizada] || `Chapa ${chapaNormalizada}`;
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `foro-message ${isOwn ? 'own' : ''}`;

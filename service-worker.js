@@ -5,12 +5,12 @@
 
 const CACHE_NAME = 'estiba-vlc-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/sheets.js',
-  '/manifest.json',
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './sheets.js',
+  './manifest.json',
   'https://i.imgur.com/7F1BWQ2.jpeg', // Logo principal
   'https://cdn.tailwindcss.com', // Tailwind CSS
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'
