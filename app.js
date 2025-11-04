@@ -53,7 +53,7 @@ const NOTICIAS_DATA = [
   { 
   titulo: '⚙️ Actualización: Sistema de Contratación más Robusto',
     fecha: '04/11/2025',
-    contenido: `Se ha implementado un sistema robusto para **garantizar la visibilidad de tus asignaciones**, incluso si el sistema principal falla:
+    contenido: `Se ha implementado un sistema robusto para garantizar la visibilidad de tus asignaciones, incluso si el sistema principal falla:
     <ul style="list-style-type: disc; margin-left: 20px; margin-top: 10px;">
       <li style="margin-bottom: 5px;"><strong>Mi Contratación:</strong> Ahora se guarda en tu dispositivo (localStorage). Si el CSV de contratación falla, tus asignaciones se mantienen visibles hasta medianoche (00:00).</li>
       <li style="margin-bottom: 5px;"><strong>Mis Jornales:</strong> El histórico es totalmente independiente y se actualiza automáticamente cada hora vía Apps Script.</li>
@@ -2118,6 +2118,7 @@ window.agregarContratacionesManual = function(contrataciones) {
 
   return { agregadas, total: historico.length };
 };
+
 
 
 
