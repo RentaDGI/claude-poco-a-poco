@@ -58,7 +58,7 @@ const NOTICIAS_DATA = [
       <li style="margin-bottom: 5px;"><strong>Mi Contratación:</strong> Ahora se guarda en tu dispositivo (localStorage). Si el CSV de contratación falla, tus asignaciones se mantienen visibles hasta medianoche (00:00).</li>
       <li style="margin-bottom: 5px;"><strong>Mis Jornales:</strong> El histórico es totalmente independiente y se actualiza automáticamente cada hora vía Apps Script.</li>
       <li><strong>Nuevo Enlace:</strong> Se ha añadido "Listado Ingreso CPE" en la sección de Enlaces Útiles.</li>
-    </ul>
+    </ul>`
   },
   {
     titulo: '🚀 ¡Nueva Función: Posición en la Puerta!',
@@ -110,7 +110,7 @@ const NOTICIAS_DATA = [
     titulo: '📢 Actualización del Sistema (Jornales)',
     fecha: '01/11/2025',
     contenido: 'Se ha mejorado el sistema de jornales. Ahora puedes exportar a CSV y ver tus jornales organizados por quincenas.'
-  }
+  },
 
 ];
 
@@ -2118,6 +2118,7 @@ window.agregarContratacionesManual = function(contrataciones) {
 
   return { agregadas, total: historico.length };
 };
+
 
 
 
