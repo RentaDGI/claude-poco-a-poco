@@ -22,6 +22,8 @@ const SHEETS_CONFIG = {
   GID_JORNALES_HISTORICO_ACUMULADO: '1604874350',  // Pestaña: Jornales_Historico_Acumulado (HISTÓRICO ROBUSTO)
   GID_CONTRATACION: '1304645770',  // Pestaña: Contrata_Glide
   GID_PUERTAS: '1650839211',       // Pestaña: Puertas (No se usa, getPuertas usa URL hardcodeada)
+  GID_MAPEO_PUESTOS: '418043978',  // Pestaña: MAPEO_PUESTOS (Para Sueldómetro)
+  GID_TABLA_SALARIOS: '1710373929' // Pestaña: TABLA_SALARIOS (Para Sueldómetro)
 
   // URL de la hoja "censo_limpio"
   URL_CENSO_LIMPIO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcJ5Irxl93zwDqehuLW7-MsuVtphRDtmF8Rwp-yueqcAYRfgrTtEdKDwX8WKkJj1m0rVJc8AncGN_A/pub?gid=1216182924&single=true&output=csv'
@@ -1077,6 +1079,58 @@ const SheetsAPI = {
 
     } catch (error) {
       console.error('❌ Error obteniendo jornales históricos acumulados:', error);
+      return [];
+    }
+  },
+
+  /**
+   * [ROBUSTO] Obtiene el mapeo de puestos (Puesto → Grupo_Salarial + Tipo_Operativa)
+   * Para el Sueldómetro
+   * Columnas esperadas: Puesto, Grupo_Salarial, Tipo_Operativa
+   */
+  async getMapeoPuestos() {
+    try {
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_MAPEO_PUESTOS);
+
+      // Mapear los datos con las columnas esperadas
+      const mapeo = data.map(row => ({
+        puesto: row.Puesto || row.puesto || '',
+        grupo_salarial: row.Grupo_Salarial || row.grupo_salarial || '',
+        tipo_operativa: row.Tipo_Operativa || row.tipo_operativa || ''
+      })).filter(item => item.puesto && item.grupo_salarial && item.tipo_operativa);
+
+      console.log(`✅ Mapeo de puestos cargado: ${mapeo.length} registros`);
+      return mapeo;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo mapeo de puestos:', error);
+      return [];
+    }
+  },
+
+  /**
+   * [ROBUSTO] Obtiene la tabla salarial (Clave_Jornada → Salarios base y primas)
+   * Para el Sueldómetro
+   * Columnas esperadas: Clave_Jornada, Jornal_Base_G1, Jornal_Base_G2, Prima_Minima_Coches, Coef_Prima_Mayor120
+   */
+  async getTablaSalarial() {
+    try {
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_TABLA_SALARIOS);
+
+      // Mapear los datos con las columnas esperadas
+      const tablaSalarial = data.map(row => ({
+        clave_jornada: row.Clave_Jornada || row.clave_jornada || '',
+        jornal_base_g1: parseFloat(row.Jornal_Base_G1 || row.jornal_base_g1 || 0),
+        jornal_base_g2: parseFloat(row.Jornal_Base_G2 || row.jornal_base_g2 || 0),
+        prima_minima_coches: parseFloat(row.Prima_Minima_Coches || row.prima_minima_coches || 0),
+        coef_prima_mayor120: parseFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120 || 0)
+      })).filter(item => item.clave_jornada);
+
+      console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros`);
+      return tablaSalarial;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo tabla salarial:', error);
       return [];
     }
   },

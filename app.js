@@ -653,6 +653,9 @@ function navigateTo(pageName) {
     case 'foro':
       loadForo();
       break;
+    case 'sueldometro':
+      loadSueldometro();
+      break;
   }
 }
 
@@ -2118,6 +2121,271 @@ window.agregarContratacionesManual = function(contrataciones) {
 
   return { agregadas, total: historico.length };
 };
+
+/**
+ * ===== SUELDÓMETRO =====
+ */
+
+/**
+ * Determina el tipo de día (LABORABLE, SABADO, FESTIVO, FEST. A LAB.)
+ * basado en la fecha y jornada
+ */
+function determinarTipoDia(fecha, jornada) {
+  // Parsear fecha dd/mm/yyyy
+  const parts = fecha.split('/');
+  const day = parseInt(parts[0]);
+  const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
+  const year = parseInt(parts[2]);
+  const dateObj = new Date(year, month, day);
+
+  const dayOfWeek = dateObj.getDay(); // 0=Domingo, 6=Sábado
+
+  // Festivos de España 2025 (ajustar según sea necesario)
+  const festivos2025 = [
+    '01/01/2025', '06/01/2025', // Año Nuevo, Reyes
+    '18/04/2025', '19/04/2025', // Viernes Santo, Sábado Santo
+    '01/05/2025', // Día del Trabajador
+    '15/08/2025', // Asunción
+    '12/10/2025', // Día de la Hispanidad
+    '01/11/2025', // Todos los Santos
+    '06/12/2025', '08/12/2025', // Constitución, Inmaculada
+    '25/12/2025'  // Navidad
+  ];
+
+  const fechaNormalizada = `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`;
+  const esFestivo = festivos2025.includes(fechaNormalizada);
+
+  // Lógica de determinación
+  if (esFestivo && dayOfWeek !== 0) {
+    // Festivo que cae en día laborable (no domingo)
+    return 'FEST. A LAB.';
+  } else if (esFestivo || dayOfWeek === 0) {
+    // Festivo o domingo
+    return 'FESTIVO';
+  } else if (dayOfWeek === 6) {
+    // Sábado
+    return 'SABADO';
+  } else {
+    // Lunes a viernes
+    return 'LABORABLE';
+  }
+}
+
+/**
+ * Carga y muestra el Sueldómetro con cálculo de salarios
+ */
+async function loadSueldometro() {
+  const content = document.getElementById('sueldometro-content');
+  const loading = document.getElementById('sueldometro-loading');
+  const stats = document.getElementById('sueldometro-stats');
+
+  if (!content) return;
+
+  loading.classList.remove('hidden');
+  content.innerHTML = '';
+  stats.innerHTML = '';
+
+  try {
+    // 1. Cargar datos necesarios
+    console.log('📊 Cargando datos del Sueldómetro...');
+
+    const [jornales, mapeoPuestos, tablaSalarial] = await Promise.all([
+      SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
+      SheetsAPI.getMapeoPuestos(),
+      SheetsAPI.getTablaSalarial()
+    ]);
+
+    console.log(`✅ Datos cargados: ${jornales.length} jornales, ${mapeoPuestos.length} puestos, ${tablaSalarial.length} salarios`);
+
+    if (jornales.length === 0) {
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>No hay jornales registrados</h3>
+          <p>Cuando trabajes tus primeros jornales aparecerán aquí con su estimación salarial</p>
+        </div>
+      `;
+      loading.classList.add('hidden');
+      return;
+    }
+
+    // 2. Agrupar por quincena
+    const quincenasMap = groupByQuincena(jornales);
+
+    // 3. Calcular salario para cada jornal
+    const jornalesConSalario = jornales.map(jornal => {
+      // 3.1 Buscar en mapeo de puestos
+      const mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
+
+      if (!mapeo) {
+        console.warn(`⚠️ Puesto no encontrado en mapeo: ${jornal.puesto}`);
+        return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Puesto no mapeado' };
+      }
+
+      const grupoSalarial = mapeo.grupo_salarial; // G1 o G2
+      const tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
+
+      // 3.2 Determinar tipo de día
+      const tipoDia = determinarTipoDia(jornal.fecha, jornal.jornada);
+
+      // 3.3 Crear clave de jornada (ej: "08-14_LABORABLE")
+      const claveJornada = `${jornal.jornada}_${tipoDia}`;
+
+      // 3.4 Buscar en tabla salarial
+      const salarioInfo = tablaSalarial.find(s => s.clave_jornada === claveJornada);
+
+      if (!salarioInfo) {
+        console.warn(`⚠️ Clave de jornada no encontrada: ${claveJornada}`);
+        return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Jornada no encontrada' };
+      }
+
+      // 3.5 Obtener salario base según grupo
+      const salarioBase = grupoSalarial === 'G1' ? salarioInfo.jornal_base_g1 : salarioInfo.jornal_base_g2;
+
+      // 3.6 Calcular prima
+      let prima = 0;
+      if (tipoOperativa === 'Coches') {
+        prima = salarioInfo.prima_minima_coches;
+      } else if (tipoOperativa === 'Contenedor') {
+        prima = 120 * salarioInfo.coef_prima_mayor120;
+      }
+
+      // 3.7 Total
+      const total = salarioBase + prima;
+
+      return {
+        ...jornal,
+        salario_base: salarioBase,
+        prima: prima,
+        total: total,
+        grupo_salarial: grupoSalarial,
+        tipo_operativa: tipoOperativa,
+        tipo_dia: tipoDia,
+        clave_jornada: claveJornada
+      };
+    });
+
+    // 4. Calcular estadísticas globales
+    const totalJornales = jornalesConSalario.length;
+    const salarioTotalEstimado = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+    const salarioPromedio = salarioTotalEstimado / totalJornales;
+
+    // 5. Mostrar estadísticas
+    stats.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-value">${totalJornales}</div>
+        <div class="stat-label">Jornales Totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${salarioTotalEstimado.toFixed(2)}€</div>
+        <div class="stat-label">Salario Total Estimado</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${salarioPromedio.toFixed(2)}€</div>
+        <div class="stat-label">Promedio por Jornal</div>
+      </div>
+    `;
+
+    // 6. Renderizar quincenas con salarios
+    const quincenasArray = Array.from(quincenasMap.entries())
+      .map(([key, jornalesQuincena]) => {
+        const [year, month, quincena] = key.split('-').map(Number);
+        return { year, month, quincena, jornales: jornalesQuincena };
+      })
+      .sort((a, b) => {
+        // Ordenar por año, mes, quincena descendente
+        if (a.year !== b.year) return b.year - a.year;
+        if (a.month !== b.month) return b.month - a.month;
+        return b.quincena - a.quincena;
+      });
+
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    quincenasArray.forEach(({ year, month, quincena, jornales: jornalesQuincena }) => {
+      const jornalesConSalarioQuincena = jornalesQuincena.map(j => {
+        return jornalesConSalario.find(jcs =>
+          jcs.fecha === j.fecha &&
+          jcs.jornada === j.jornada &&
+          jcs.puesto === j.puesto
+        );
+      }).filter(j => j);
+
+      const totalQuincena = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+      const totalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
+      const totalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
+
+      const quincenaLabel = quincena === 1 ? '1-15' : '16-fin';
+      const monthName = monthNames[month - 1];
+      const emoji = quincena === 1 ? '📅' : '🗓️';
+
+      const card = document.createElement('div');
+      card.className = 'quincena-card';
+      card.innerHTML = `
+        <div class="quincena-header">
+          <h3>${emoji} ${quincenaLabel} ${monthName.toUpperCase()} ${year}</h3>
+          <div class="quincena-total">
+            <span class="total-label">Total Estimado:</span>
+            <span class="total-value">${totalQuincena.toFixed(2)}€</span>
+          </div>
+        </div>
+        <div class="quincena-summary">
+          <div class="summary-item">
+            <span class="summary-label">Jornales:</span>
+            <span class="summary-value">${jornalesConSalarioQuincena.length}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Base:</span>
+            <span class="summary-value">${totalBase.toFixed(2)}€</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Prima:</span>
+            <span class="summary-value">${totalPrima.toFixed(2)}€</span>
+          </div>
+        </div>
+        <div class="jornales-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Jornada</th>
+                <th>Puesto</th>
+                <th>Base</th>
+                <th>Prima</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${jornalesConSalarioQuincena.map(j => `
+                <tr>
+                  <td>${j.fecha}</td>
+                  <td><span class="badge badge-${j.jornada}">${j.jornada}</span></td>
+                  <td>${j.puesto}</td>
+                  <td>${j.salario_base.toFixed(2)}€</td>
+                  <td>${j.prima.toFixed(2)}€</td>
+                  <td><strong>${j.total.toFixed(2)}€</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      content.appendChild(card);
+    });
+
+  } catch (error) {
+    console.error('❌ Error cargando Sueldómetro:', error);
+    content.innerHTML = `
+      <div class="error-state">
+        <div class="error-icon">⚠️</div>
+        <h3>Error al cargar datos</h3>
+        <p>${error.message}</p>
+      </div>
+    `;
+  } finally {
+    loading.classList.add('hidden');
+  }
+}
 
 
 
