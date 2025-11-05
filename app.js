@@ -2257,25 +2257,40 @@ async function loadSueldometro() {
       // 3.1 Buscar en mapeo de puestos usando el puesto original
       let mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
 
+      // Mapeo de fallback para puestos conocidos que pueden no estar en la hoja
+      const mapeoFallback = {
+        'Especialista': { puesto: 'Especialista', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
+        'Trincador': { puesto: 'Trincador', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
+        'Trincador de Coches': { puesto: 'Trincador de Coches', grupo_salarial: 'G1', tipo_operativa: 'Manual' },
+        'Conductor de Coches': { puesto: 'Conductor de Coches', grupo_salarial: 'G2', tipo_operativa: 'Coches' },
+        'Conductor de 2a': { puesto: 'Conductor de 2a', grupo_salarial: 'G2', tipo_operativa: 'Coches' }
+      };
+
       if (!mapeo) {
-        console.warn(`⚠️ Puesto no encontrado en mapeo: "${jornal.puesto}"`);
-        if (index === 0) {
-          console.log('Puestos disponibles en mapeo:', mapeoPuestos.map(m => m.puesto));
+        // Intentar usar mapeo de fallback
+        if (mapeoFallback[jornal.puesto]) {
+          mapeo = mapeoFallback[jornal.puesto];
+          console.log(`ℹ️ Usando mapeo de fallback para: "${jornal.puesto}"`);
+        } else {
+          console.warn(`⚠️ Puesto no encontrado en mapeo: "${jornal.puesto}"`);
+          if (index === 0) {
+            console.log('Puestos disponibles en mapeo:', mapeoPuestos.map(m => m.puesto));
+          }
+          return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Puesto no mapeado' };
         }
-        return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Puesto no mapeado' };
       }
 
       // Obtener grupo salarial y tipo de operativa
       let grupoSalarial = mapeo.grupo_salarial; // G1 o G2
       let tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
 
-      // Forzar valores correctos para Conductor de Coches
-      if (jornal.puesto === 'Conductor de Coches') {
+      // Forzar valores correctos para Conductor de Coches (asegurar coherencia)
+      if (jornal.puesto === 'Conductor de Coches' || jornal.puesto === 'Conductor de 2a') {
         grupoSalarial = 'G2';
         tipoOperativa = 'Coches';
       }
 
-      // Normalizar nombre de puesto para display: "Conductor de Coches" → "Conductor de 2a"
+      // Normalizar nombre de puesto para display
       let puestoDisplay = jornal.puesto;
       if (jornal.puesto === 'Conductor de Coches') {
         puestoDisplay = 'Conductor de 2a';
@@ -2343,6 +2358,9 @@ async function loadSueldometro() {
         } else if (tipoOperativa === 'Contenedor') {
           // A partir de 120 movimientos (>=120) se usa coef_mayor
           prima = 120 * salarioInfo.coef_prima_mayor120;
+        } else if (tipoOperativa === 'Manual') {
+          // Para Manual (ej: Trincador de Coches): prima editable, iniciar en 0
+          prima = 0;
         }
       }
 
@@ -2652,10 +2670,49 @@ async function loadSueldometro() {
 
         // Guardar en localStorage
         localStorage.setItem(irpfKey, nuevoIRPF.toString());
+        irpfPorcentaje = nuevoIRPF;
 
-        // Recargar Sueldómetro con nuevo IRPF
         console.log(`💰 IRPF actualizado a ${nuevoIRPF}%`);
-        loadSueldometro();
+
+        // Actualizar todos los valores neto sin recargar la página
+        // 1. Actualizar estadísticas globales
+        const totalGlobalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+        const totalGlobalNeto = totalGlobalBruto * (1 - irpfPorcentaje / 100);
+
+        const statCards = stats.querySelectorAll('.stat-card .stat-value');
+        if (statCards.length >= 3) {
+          statCards[2].textContent = `${totalGlobalNeto.toFixed(2)}€`; // Total Neto
+          // Actualizar label con nuevo %
+          const netoLabel = stats.querySelectorAll('.stat-card .stat-label')[2];
+          if (netoLabel) netoLabel.textContent = `Total Neto (${irpfPorcentaje}% IRPF)`;
+        }
+
+        // 2. Actualizar todas las filas de jornales y totales de quincena
+        document.querySelectorAll('.quincena-card').forEach(card => {
+          // Actualizar todas las filas de la tabla
+          card.querySelectorAll('tbody tr').forEach(row => {
+            const brutoElement = row.querySelector('.bruto-value strong');
+            if (brutoElement) {
+              const bruto = parseFloat(brutoElement.textContent.replace('€', ''));
+              const neto = bruto * (1 - irpfPorcentaje / 100);
+              const netoElement = row.querySelector('.neto-value strong');
+              if (netoElement) {
+                netoElement.textContent = `${neto.toFixed(2)}€`;
+              }
+            }
+          });
+
+          // Actualizar totales de la quincena en el header
+          const brutoValueElement = card.querySelector('.quincena-total .bruto-value');
+          if (brutoValueElement) {
+            const totalBruto = parseFloat(brutoValueElement.textContent.replace('€', ''));
+            const totalNeto = totalBruto * (1 - irpfPorcentaje / 100);
+            const netoValueElement = card.querySelector('.quincena-total .neto-value');
+            if (netoValueElement) {
+              netoValueElement.textContent = `${totalNeto.toFixed(2)}€`;
+            }
+          }
+        });
       });
     }
 
