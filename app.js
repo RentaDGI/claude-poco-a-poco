@@ -2213,12 +2213,15 @@ async function loadSueldometro() {
     const quincenasMap = groupByQuincena(jornales);
 
     // 3. Calcular salario para cada jornal
-    const jornalesConSalario = jornales.map(jornal => {
+    const jornalesConSalario = jornales.map((jornal, index) => {
       // 3.1 Buscar en mapeo de puestos
       const mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
 
       if (!mapeo) {
-        console.warn(`⚠️ Puesto no encontrado en mapeo: ${jornal.puesto}`);
+        console.warn(`⚠️ Puesto no encontrado en mapeo: "${jornal.puesto}"`);
+        if (index === 0) {
+          console.log('Puestos disponibles en mapeo:', mapeoPuestos.map(m => m.puesto));
+        }
         return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Puesto no mapeado' };
       }
 
@@ -2235,14 +2238,27 @@ async function loadSueldometro() {
       const salarioInfo = tablaSalarial.find(s => s.clave_jornada === claveJornada);
 
       if (!salarioInfo) {
-        console.warn(`⚠️ Clave de jornada no encontrada: ${claveJornada}`);
+        console.warn(`⚠️ Clave de jornada no encontrada: "${claveJornada}"`);
+        if (index === 0) {
+          console.log('Claves disponibles en tabla salarial:', tablaSalarial.map(t => t.clave_jornada));
+        }
         return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Jornada no encontrada' };
+      }
+
+      // Debug del primer jornal
+      if (index === 0) {
+        console.log('🔍 DEBUG PRIMER JORNAL:');
+        console.log('  Jornal:', jornal);
+        console.log('  Mapeo encontrado:', mapeo);
+        console.log('  Tipo día:', tipoDia);
+        console.log('  Clave jornada:', claveJornada);
+        console.log('  Salario info:', salarioInfo);
       }
 
       // 3.5 Obtener salario base según grupo
       const salarioBase = grupoSalarial === 'G1' ? salarioInfo.jornal_base_g1 : salarioInfo.jornal_base_g2;
 
-      // 3.6 Calcular prima
+      // 3.6 Calcular prima (por defecto 120 movimientos)
       let prima = 0;
       if (tipoOperativa === 'Coches') {
         prima = salarioInfo.prima_minima_coches;
@@ -2252,6 +2268,13 @@ async function loadSueldometro() {
 
       // 3.7 Total
       const total = salarioBase + prima;
+
+      if (index === 0) {
+        console.log('  Grupo salarial:', grupoSalarial);
+        console.log('  Salario base:', salarioBase);
+        console.log('  Prima (120 mov):', prima);
+        console.log('  Total:', total);
+      }
 
       return {
         ...jornal,

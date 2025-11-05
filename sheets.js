@@ -1096,6 +1096,8 @@ const SheetsAPI = {
     try {
       const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_MAPEO_PUESTOS);
 
+      console.log('📋 Datos raw de mapeo_puestos:', data.slice(0, 3)); // Primeros 3 registros
+
       // Mapear los datos con las columnas esperadas
       const mapeo = data.map(row => ({
         puesto: row.Puesto || row.puesto || '',
@@ -1104,6 +1106,9 @@ const SheetsAPI = {
       })).filter(item => item.puesto && item.grupo_salarial && item.tipo_operativa);
 
       console.log(`✅ Mapeo de puestos cargado: ${mapeo.length} registros`);
+      if (mapeo.length > 0) {
+        console.log('📝 Ejemplo de mapeo:', mapeo[0]);
+      }
       return mapeo;
 
     } catch (error) {
@@ -1121,16 +1126,22 @@ const SheetsAPI = {
     try {
       const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_TABLA_SALARIOS);
 
+      console.log('📋 Datos raw de tabla_salarios:', data.slice(0, 3)); // Primeros 3 registros
+
       // Mapear los datos con las columnas esperadas
       const tablaSalarial = data.map(row => ({
         clave_jornada: row.Clave_Jornada || row.clave_jornada || '',
         jornal_base_g1: parseFloat(row.Jornal_Base_G1 || row.jornal_base_g1 || 0),
         jornal_base_g2: parseFloat(row.Jornal_Base_G2 || row.jornal_base_g2 || 0),
         prima_minima_coches: parseFloat(row.Prima_Minima_Coches || row.prima_minima_coches || 0),
+        coef_prima_menor120: parseFloat(row.Coef_Prima_Menor120 || row.coef_prima_menor120 || 0),
         coef_prima_mayor120: parseFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120 || 0)
       })).filter(item => item.clave_jornada);
 
       console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros`);
+      if (tablaSalarial.length > 0) {
+        console.log('📝 Ejemplo de tabla salarial:', tablaSalarial[0]);
+      }
       return tablaSalarial;
 
     } catch (error) {
