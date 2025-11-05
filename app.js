@@ -2371,10 +2371,9 @@ async function loadSueldometro() {
 
         // Añadir complemento de 46,94€ para Trincador y Trincador de Coches
         if (puestoLower === 'trincador' || puestoLower === 'trincador de coches') {
+          console.log(`💰 ANTES complemento - Puesto: "${jornal.puesto}", puestoLower: "${puestoLower}", salarioBase: ${salarioBase}`);
           salarioBase += 46.94;
-          if (index === 0) {
-            console.log(`💰 Complemento de 46,94€ añadido para ${jornal.puesto}`);
-          }
+          console.log(`💰 DESPUÉS complemento - Puesto: "${jornal.puesto}", salarioBase: ${salarioBase}`);
         }
 
         // 3.6 Calcular prima (por defecto 120 movimientos para Contenedor)
@@ -2492,6 +2491,9 @@ async function loadSueldometro() {
       const totalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
       const totalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
 
+      // Verificar si hay jornales con complemento en esta quincena
+      const tieneComplemento = jornalesConSalarioQuincena.some(j => j.incluye_complemento);
+
       const quincenaLabel = quincena === 1 ? '1-15' : '16-fin';
       const monthName = monthNames[month - 1];
       const emoji = quincena === 1 ? '📅' : '🗓️';
@@ -2593,9 +2595,11 @@ async function loadSueldometro() {
             </tbody>
           </table>
         </div>
-        <div class="complemento-nota" style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-radius: 4px;">
-          <strong>*</strong> Los puestos Trincador y Trincador de Coches incluyen un complemento de 46,94€ en el salario base.
-        </div>
+        ${tieneComplemento ? `
+          <div class="complemento-nota" style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-radius: 4px;">
+            <strong>*</strong> Los puestos Trincador y Trincador de Coches incluyen un complemento de 46,94€ en el salario base.
+          </div>
+        ` : ''}
       `;
 
       content.appendChild(card);
