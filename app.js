@@ -2260,7 +2260,7 @@ async function loadSueldometro() {
       // Mapeo de fallback para puestos conocidos que pueden no estar en la hoja
       const mapeoFallback = {
         'Especialista': { puesto: 'Especialista', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
-        'Trincador': { puesto: 'Trincador', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
+        'Trincador': { puesto: 'Trincador', grupo_salarial: 'G1', tipo_operativa: 'Trincador' },
         'Trincador de Coches': { puesto: 'Trincador de Coches', grupo_salarial: 'G1', tipo_operativa: 'Manual' },
         'Conductor de Coches': { puesto: 'Conductor de Coches', grupo_salarial: 'G2', tipo_operativa: 'Coches' },
         'Conductor de 2a': { puesto: 'Conductor de 2a', grupo_salarial: 'G2', tipo_operativa: 'Coches' }
@@ -2332,6 +2332,22 @@ async function loadSueldometro() {
       let prima = 0;
       let esJornalFijo = false;
 
+      // Tabla de primas mínimas para Trincador según horario y jornada
+      const primasMinimaTrincador = {
+        '02-08_FESTIVO': 203.719,
+        '02-08_LABORABLE': 140.105,
+        '02-08_SABADO': 140.105,
+        '08-14_FESTIVO': 114.031,
+        '08-14_LABORABLE': 88.822,
+        '08-14_SABADO': 88.822,
+        '14-20_FESTIVO': 144.967,
+        '14-20_LABORABLE': 88.822,
+        '14-20_SABADO': 114.031,
+        '20-02_FESTIVO': 220.058,
+        '20-02_LABORABLE': 112.287,
+        '20-02_SABADO': 151.393
+      };
+
       if (esConductorOC) {
         // Conductores OC tienen salarios fijos sin prima (solo laborables)
         esJornalFijo = true;
@@ -2345,8 +2361,16 @@ async function loadSueldometro() {
         salarioBase = salariosOC[jornada] || 0;
         prima = 0; // Sin prima para OC
       } else {
-        // Cálculo normal para SP y Contenedor/Coches
+        // Cálculo normal para SP y Contenedor/Coches/Trincador
         salarioBase = grupoSalarial === 'G1' ? salarioInfo.jornal_base_g1 : salarioInfo.jornal_base_g2;
+
+        // Añadir complemento de 46,94€ para Trincador y Trincador de Coches
+        if (jornal.puesto === 'Trincador' || jornal.puesto === 'Trincador de Coches') {
+          salarioBase += 46.94;
+          if (index === 0) {
+            console.log(`💰 Complemento de 46,94€ añadido para ${jornal.puesto}`);
+          }
+        }
 
         // 3.6 Calcular prima (por defecto 120 movimientos para Contenedor)
         if (tipoOperativa === 'Coches') {
@@ -2358,9 +2382,19 @@ async function loadSueldometro() {
         } else if (tipoOperativa === 'Contenedor') {
           // A partir de 120 movimientos (>=120) se usa coef_mayor
           prima = 120 * salarioInfo.coef_prima_mayor120;
+        } else if (tipoOperativa === 'Trincador') {
+          // Para Trincador: usar prima mínima según horario y jornada
+          const clavePrima = `${jornada}_${tipoDia}`;
+          prima = primasMinimaTrincador[clavePrima] || 0;
+          if (index === 0) {
+            console.log(`🔧 Trincador detectado - Prima mínima: ${prima}€ (clave: ${clavePrima})`);
+          }
         } else if (tipoOperativa === 'Manual') {
           // Para Manual (ej: Trincador de Coches): prima editable, iniciar en 0
           prima = 0;
+          if (index === 0) {
+            console.log(`✋ Manual detectado (${jornal.puesto}) - Prima editable iniciada en 0€`);
+          }
         }
       }
 
