@@ -2402,27 +2402,106 @@ async function loadSueldometro() {
                 <th>Jornada</th>
                 <th>Puesto</th>
                 <th>Base</th>
+                <th>Movimientos</th>
                 <th>Prima</th>
                 <th>Total</th>
               </tr>
             </thead>
-            <tbody>
-              ${jornalesConSalarioQuincena.map(j => `
-                <tr>
+            <tbody id="tbody-${year}-${month}-${quincena}">
+              ${jornalesConSalarioQuincena.map((j, idx) => {
+                const rowId = `row-${year}-${month}-${quincena}-${idx}`;
+                // Calcular movimientos equivalentes actuales (por defecto 120 para contenedor)
+                let movimientosDefault = 120;
+                if (j.tipo_operativa === 'Coches') {
+                  movimientosDefault = 0; // Para coches no usamos movimientos, es prima fija
+                }
+
+                return `
+                <tr id="${rowId}" data-row-index="${idx}">
                   <td>${j.fecha}</td>
-                  <td><span class="badge badge-${j.jornada}">${j.jornada}</span></td>
+                  <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
                   <td>${j.puesto}</td>
-                  <td>${j.salario_base.toFixed(2)}€</td>
-                  <td>${j.prima.toFixed(2)}€</td>
-                  <td><strong>${j.total.toFixed(2)}€</strong></td>
+                  <td class="base-value">${j.salario_base.toFixed(2)}€</td>
+                  <td>
+                    ${j.tipo_operativa === 'Contenedor' ? `
+                      <input
+                        type="number"
+                        class="movimientos-input"
+                        value="${movimientosDefault}"
+                        min="0"
+                        step="1"
+                        data-jornal-index="${idx}"
+                      />
+                    ` : `
+                      <span class="text-muted">N/A</span>
+                    `}
+                  </td>
+                  <td class="prima-value">${j.prima.toFixed(2)}€</td>
+                  <td class="total-value"><strong>${j.total.toFixed(2)}€</strong></td>
                 </tr>
-              `).join('')}
+              `}).join('')}
             </tbody>
           </table>
         </div>
       `;
 
       content.appendChild(card);
+
+      // Añadir event listeners para recalcular cuando cambien los movimientos
+      card.querySelectorAll('.movimientos-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const movimientos = parseFloat(e.target.value) || 0;
+          const jornalIndex = parseInt(e.target.dataset.jornalIndex);
+          const jornal = jornalesConSalarioQuincena[jornalIndex];
+
+          // Recalcular prima según movimientos
+          let nuevaPrima = 0;
+          const salarioInfo = tablaSalarial.find(s => s.clave_jornada === jornal.clave_jornada);
+
+          if (salarioInfo) {
+            if (jornal.tipo_operativa === 'Contenedor') {
+              // Para contenedor: usar coeficiente según movimientos
+              if (movimientos <= 120) {
+                nuevaPrima = movimientos * salarioInfo.coef_prima_menor120;
+              } else {
+                nuevaPrima = movimientos * salarioInfo.coef_prima_mayor120;
+              }
+            }
+          }
+
+          const nuevoTotal = jornal.salario_base + nuevaPrima;
+
+          // Actualizar la fila con animación
+          const row = e.target.closest('tr');
+          row.classList.add('updating');
+          setTimeout(() => row.classList.remove('updating'), 600);
+
+          row.querySelector('.prima-value').textContent = `${nuevaPrima.toFixed(2)}€`;
+          row.querySelector('.total-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+
+          // Actualizar el jornal en el array
+          jornal.prima = nuevaPrima;
+          jornal.total = nuevoTotal;
+
+          // Recalcular totales de la quincena
+          const nuevoTotalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
+          const nuevoTotalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
+          const nuevoTotalQuincena = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+
+          // Actualizar el resumen de la quincena
+          const summaryItems = card.querySelectorAll('.summary-value');
+          summaryItems[1].textContent = `${nuevoTotalBase.toFixed(2)}€`; // Base
+          summaryItems[2].textContent = `${nuevoTotalPrima.toFixed(2)}€`; // Prima
+          card.querySelector('.total-value').textContent = `${nuevoTotalQuincena.toFixed(2)}€`; // Total
+
+          // Recalcular estadísticas globales
+          const totalGlobalEstimado = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+          const promedioGlobal = totalGlobalEstimado / jornalesConSalario.length;
+
+          stats.querySelector('.stat-card:nth-child(2) .stat-value').textContent = `${totalGlobalEstimado.toFixed(2)}€`;
+          stats.querySelector('.stat-card:nth-child(3) .stat-value').textContent = `${promedioGlobal.toFixed(2)}€`;
+        });
+      });
     });
 
   } catch (error) {
