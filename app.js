@@ -2211,6 +2211,17 @@ async function loadSueldometro() {
   content.innerHTML = '';
   stats.innerHTML = '';
 
+  // Inicializar IRPF control
+  const irpfControl = document.getElementById('sueldometro-irpf-control');
+  const irpfInput = document.getElementById('irpf-input');
+
+  // Cargar IRPF guardado o usar valor por defecto (15%)
+  const irpfKey = `irpf_${AppState.currentUser}`;
+  let irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+  if (irpfInput) {
+    irpfInput.value = irpfPorcentaje;
+  }
+
   try {
     // 1. Cargar datos necesarios
     console.log('📊 Cargando datos del Sueldómetro...');
@@ -2362,22 +2373,32 @@ async function loadSueldometro() {
 
     // 4. Calcular estadísticas globales
     const totalJornales = jornalesConSalario.length;
-    const salarioTotalEstimado = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
-    const salarioPromedio = salarioTotalEstimado / totalJornales;
+    const salarioTotalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+    const salarioTotalNeto = salarioTotalBruto * (1 - irpfPorcentaje / 100);
+    const salarioPromedioBruto = salarioTotalBruto / totalJornales;
+    const salarioPromedioNeto = salarioTotalNeto / totalJornales;
 
-    // 5. Mostrar estadísticas
+    // 5. Mostrar IRPF control y estadísticas
+    if (irpfControl) {
+      irpfControl.style.display = 'block';
+    }
+
     stats.innerHTML = `
       <div class="stat-card">
         <div class="stat-value">${totalJornales}</div>
         <div class="stat-label">Jornales Totales</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${salarioTotalEstimado.toFixed(2)}€</div>
-        <div class="stat-label">Salario Total Estimado</div>
+        <div class="stat-value">${salarioTotalBruto.toFixed(2)}€</div>
+        <div class="stat-label">Total Bruto</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${salarioPromedio.toFixed(2)}€</div>
-        <div class="stat-label">Promedio por Jornal</div>
+        <div class="stat-value">${salarioTotalNeto.toFixed(2)}€</div>
+        <div class="stat-label">Total Neto (${irpfPorcentaje}% IRPF)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${salarioPromedioBruto.toFixed(2)}€</div>
+        <div class="stat-label">Promedio Bruto</div>
       </div>
     `;
 
@@ -2405,7 +2426,8 @@ async function loadSueldometro() {
         );
       }).filter(j => j);
 
-      const totalQuincena = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+      const totalQuincenaBruto = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+      const totalQuincenaNeto = totalQuincenaBruto * (1 - irpfPorcentaje / 100);
       const totalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
       const totalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
 
@@ -2419,8 +2441,16 @@ async function loadSueldometro() {
         <div class="quincena-header">
           <h3>${emoji} ${quincenaLabel} ${monthName.toUpperCase()} ${year}</h3>
           <div class="quincena-total">
-            <span class="total-label">Total Estimado:</span>
-            <span class="total-value">${totalQuincena.toFixed(2)}€</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
+              <div>
+                <span class="total-label">Bruto:</span>
+                <span class="total-value bruto-value">${totalQuincenaBruto.toFixed(2)}€</span>
+              </div>
+              <div>
+                <span class="total-label">Neto:</span>
+                <span class="total-value neto-value">${totalQuincenaNeto.toFixed(2)}€</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="quincena-summary">
@@ -2447,7 +2477,8 @@ async function loadSueldometro() {
                 <th>Base</th>
                 <th>Movimientos</th>
                 <th>Prima</th>
-                <th>Total</th>
+                <th>Bruto</th>
+                <th>Neto</th>
               </tr>
             </thead>
             <tbody id="tbody-${year}-${month}-${quincena}">
@@ -2455,6 +2486,8 @@ async function loadSueldometro() {
                 const rowId = `row-${year}-${month}-${quincena}-${idx}`;
                 const movimientosDefault = 120;
                 const esOC = j.es_jornal_fijo;
+                const bruto = j.total;
+                const neto = bruto * (1 - irpfPorcentaje / 100);
 
                 return `
                 <tr id="${rowId}" data-row-index="${idx}">
@@ -2492,7 +2525,8 @@ async function loadSueldometro() {
                       />€
                     `}
                   </td>
-                  <td class="total-value"><strong>${j.total.toFixed(2)}€</strong></td>
+                  <td class="bruto-value"><strong>${bruto.toFixed(2)}€</strong></td>
+                  <td class="neto-value"><strong>${neto.toFixed(2)}€</strong></td>
                 </tr>
               `}).join('')}
             </tbody>
@@ -2507,20 +2541,31 @@ async function loadSueldometro() {
         // Recalcular totales de la quincena
         const nuevoTotalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
         const nuevoTotalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
-        const nuevoTotalQuincena = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+        const nuevoTotalBruto = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
+        const nuevoTotalNeto = nuevoTotalBruto * (1 - irpfPorcentaje / 100);
 
         // Actualizar el resumen de la quincena
         const summaryItems = card.querySelectorAll('.summary-value');
         summaryItems[1].textContent = `${nuevoTotalBase.toFixed(2)}€`; // Base
         summaryItems[2].textContent = `${nuevoTotalPrima.toFixed(2)}€`; // Prima
-        card.querySelector('.quincena-total .total-value').textContent = `${nuevoTotalQuincena.toFixed(2)}€`; // Total
+
+        // Actualizar bruto y neto en el header
+        const brutoValue = card.querySelector('.bruto-value');
+        const netoValue = card.querySelector('.neto-value');
+        if (brutoValue) brutoValue.textContent = `${nuevoTotalBruto.toFixed(2)}€`;
+        if (netoValue) netoValue.textContent = `${nuevoTotalNeto.toFixed(2)}€`;
 
         // Recalcular estadísticas globales
-        const totalGlobalEstimado = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
-        const promedioGlobal = totalGlobalEstimado / jornalesConSalario.length;
+        const totalGlobalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+        const totalGlobalNeto = totalGlobalBruto * (1 - irpfPorcentaje / 100);
+        const promedioBruto = totalGlobalBruto / jornalesConSalario.length;
 
-        stats.querySelector('.stat-card:nth-child(2) .stat-value').textContent = `${totalGlobalEstimado.toFixed(2)}€`;
-        stats.querySelector('.stat-card:nth-child(3) .stat-value').textContent = `${promedioGlobal.toFixed(2)}€`;
+        const statCards = stats.querySelectorAll('.stat-card .stat-value');
+        if (statCards.length >= 3) {
+          statCards[1].textContent = `${totalGlobalBruto.toFixed(2)}€`; // Total Bruto
+          statCards[2].textContent = `${totalGlobalNeto.toFixed(2)}€`; // Total Neto
+          statCards[3].textContent = `${promedioBruto.toFixed(2)}€`; // Promedio Bruto
+        }
       };
 
       // Event listener para inputs de movimientos
@@ -2545,6 +2590,7 @@ async function loadSueldometro() {
           }
 
           const nuevoTotal = jornal.salario_base + nuevaPrima;
+          const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
           row.classList.add('updating');
@@ -2554,7 +2600,8 @@ async function loadSueldometro() {
           const primaInput = row.querySelector('.prima-input');
           if (primaInput) primaInput.value = nuevaPrima.toFixed(2);
 
-          row.querySelector('.total-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.neto-value strong').textContent = `${nuevoNeto.toFixed(2)}€`;
 
           // Actualizar el jornal en el array
           jornal.prima = nuevaPrima;
@@ -2573,12 +2620,14 @@ async function loadSueldometro() {
           const row = e.target.closest('tr');
 
           const nuevoTotal = jornal.salario_base + nuevaPrima;
+          const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
           row.classList.add('updating');
           setTimeout(() => row.classList.remove('updating'), 600);
 
-          row.querySelector('.total-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.neto-value strong').textContent = `${nuevoNeto.toFixed(2)}€`;
 
           // Actualizar el jornal en el array
           jornal.prima = nuevaPrima;
@@ -2588,6 +2637,27 @@ async function loadSueldometro() {
         });
       });
     });
+
+    // Event listener para cambios en IRPF
+    if (irpfInput) {
+      irpfInput.addEventListener('change', (e) => {
+        const nuevoIRPF = parseFloat(e.target.value) || 0;
+
+        // Validar rango (0-50%)
+        if (nuevoIRPF < 0 || nuevoIRPF > 50) {
+          alert('El porcentaje de IRPF debe estar entre 0% y 50%');
+          e.target.value = irpfPorcentaje;
+          return;
+        }
+
+        // Guardar en localStorage
+        localStorage.setItem(irpfKey, nuevoIRPF.toString());
+
+        // Recargar Sueldómetro con nuevo IRPF
+        console.log(`💰 IRPF actualizado a ${nuevoIRPF}%`);
+        loadSueldometro();
+      });
+    }
 
   } catch (error) {
     console.error('❌ Error cargando Sueldómetro:', error);

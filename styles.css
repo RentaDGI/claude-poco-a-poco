@@ -1624,6 +1624,67 @@ body::before {
   font-size: 0.875rem;
 }
 
+/* Control de IRPF */
+.irpf-control {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid var(--puerto-orange);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+}
+
+.irpf-control-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.irpf-control label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  color: var(--puerto-blue);
+}
+
+.irpf-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--puerto-blue);
+}
+
+#irpf-input {
+  width: 80px;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--puerto-orange);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--puerto-orange);
+  background: white;
+  transition: all 0.2s;
+}
+
+#irpf-input:focus {
+  outline: none;
+  border-color: var(--puerto-blue);
+  box-shadow: 0 0 0 3px rgba(10, 46, 92, 0.1);
+}
+
+#irpf-input:hover {
+  border-color: var(--puerto-blue-light);
+}
+
+.irpf-help {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 /* Animación de actualización */
 @keyframes highlight {
   0%, 100% {
