@@ -2254,22 +2254,25 @@ async function loadSueldometro() {
       // Normalizar jornada: "08 a 14" → "08-14", "20 a 02" → "20-02"
       let jornada = jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '').trim();
 
-      // 3.1 Buscar en mapeo de puestos usando el puesto original
-      let mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
+      // Normalizar puesto para comparaciones case-insensitive
+      const puestoLower = jornal.puesto.toLowerCase();
+
+      // 3.1 Buscar en mapeo de puestos usando comparación case-insensitive
+      let mapeo = mapeoPuestos.find(m => m.puesto.toLowerCase() === puestoLower);
 
       // Mapeo de fallback para puestos conocidos que pueden no estar en la hoja
       const mapeoFallback = {
-        'Especialista': { puesto: 'Especialista', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
-        'Trincador': { puesto: 'Trincador', grupo_salarial: 'G1', tipo_operativa: 'Trincador' },
-        'Trincador de Coches': { puesto: 'Trincador de Coches', grupo_salarial: 'G1', tipo_operativa: 'Manual' },
-        'Conductor de Coches': { puesto: 'Conductor de Coches', grupo_salarial: 'G2', tipo_operativa: 'Coches' },
-        'Conductor de 2a': { puesto: 'Conductor de 2a', grupo_salarial: 'G2', tipo_operativa: 'Coches' }
+        'especialista': { puesto: 'Especialista', grupo_salarial: 'G1', tipo_operativa: 'Contenedor' },
+        'trincador': { puesto: 'Trincador', grupo_salarial: 'G1', tipo_operativa: 'Trincador' },
+        'trincador de coches': { puesto: 'Trincador de Coches', grupo_salarial: 'G1', tipo_operativa: 'Manual' },
+        'conductor de coches': { puesto: 'Conductor de Coches', grupo_salarial: 'G2', tipo_operativa: 'Coches' },
+        'conductor de 2a': { puesto: 'Conductor de 2a', grupo_salarial: 'G2', tipo_operativa: 'Coches' }
       };
 
       if (!mapeo) {
-        // Intentar usar mapeo de fallback
-        if (mapeoFallback[jornal.puesto]) {
-          mapeo = mapeoFallback[jornal.puesto];
+        // Intentar usar mapeo de fallback (búsqueda case-insensitive)
+        if (mapeoFallback[puestoLower]) {
+          mapeo = mapeoFallback[puestoLower];
           console.log(`ℹ️ Usando mapeo de fallback para: "${jornal.puesto}"`);
         } else {
           console.warn(`⚠️ Puesto no encontrado en mapeo: "${jornal.puesto}"`);
@@ -2285,14 +2288,14 @@ async function loadSueldometro() {
       let tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
 
       // Forzar valores correctos para Conductor de Coches (asegurar coherencia)
-      if (jornal.puesto === 'Conductor de Coches' || jornal.puesto === 'Conductor de 2a') {
+      if (puestoLower === 'conductor de coches' || puestoLower === 'conductor de 2a') {
         grupoSalarial = 'G2';
         tipoOperativa = 'Coches';
       }
 
       // Normalizar nombre de puesto para display
       let puestoDisplay = jornal.puesto;
-      if (jornal.puesto === 'Conductor de Coches') {
+      if (puestoLower === 'conductor de coches') {
         puestoDisplay = 'Conductor de 2a';
       }
 
@@ -2325,7 +2328,7 @@ async function loadSueldometro() {
 
       // 3.5 Detectar si es Conductor OC (sin barco)
       // OC usa "--" (dos guiones) en el campo buque
-      const esConductorOC = jornal.puesto === 'Conductor de 1a' &&
+      const esConductorOC = puestoLower === 'conductor de 1a' &&
                             (!jornal.buque || jornal.buque.trim() === '' || jornal.buque.trim() === '--');
 
       let salarioBase = 0;
@@ -2365,7 +2368,7 @@ async function loadSueldometro() {
         salarioBase = grupoSalarial === 'G1' ? salarioInfo.jornal_base_g1 : salarioInfo.jornal_base_g2;
 
         // Añadir complemento de 46,94€ para Trincador y Trincador de Coches
-        if (jornal.puesto === 'Trincador' || jornal.puesto === 'Trincador de Coches') {
+        if (puestoLower === 'trincador' || puestoLower === 'trincador de coches') {
           salarioBase += 46.94;
           if (index === 0) {
             console.log(`💰 Complemento de 46,94€ añadido para ${jornal.puesto}`);
