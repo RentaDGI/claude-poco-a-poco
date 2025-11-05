@@ -1099,11 +1099,19 @@ const SheetsAPI = {
       console.log('📋 Datos raw de mapeo_puestos:', data.slice(0, 3)); // Primeros 3 registros
 
       // Mapear los datos con las columnas esperadas
-      const mapeo = data.map(row => ({
-        puesto: row.Puesto || row.puesto || '',
-        grupo_salarial: row.Grupo_Salarial || row.grupo_salarial || '',
-        tipo_operativa: row.Tipo_Operativa || row.tipo_operativa || ''
-      })).filter(item => item.puesto && item.grupo_salarial && item.tipo_operativa);
+      const mapeo = data.map(row => {
+        let grupoSalarial = row.Grupo_Salarial || row.grupo_salarial || '';
+
+        // Normalizar "Grupo 1" → "G1", "Grupo 2" → "G2"
+        if (grupoSalarial.includes('1')) grupoSalarial = 'G1';
+        else if (grupoSalarial.includes('2')) grupoSalarial = 'G2';
+
+        return {
+          puesto: row.Puesto || row.puesto || '',
+          grupo_salarial: grupoSalarial,
+          tipo_operativa: row.Tipo_Operativa || row.tipo_operativa || ''
+        };
+      }).filter(item => item.puesto && item.grupo_salarial && item.tipo_operativa);
 
       console.log(`✅ Mapeo de puestos cargado: ${mapeo.length} registros`);
       if (mapeo.length > 0) {
@@ -1128,14 +1136,21 @@ const SheetsAPI = {
 
       console.log('📋 Datos raw de tabla_salarios:', data.slice(0, 3)); // Primeros 3 registros
 
+      // Función auxiliar para parsear números europeos (coma decimal)
+      const parseEuropeanFloat = (value) => {
+        if (!value) return 0;
+        const str = value.toString().replace(',', '.');
+        return parseFloat(str) || 0;
+      };
+
       // Mapear los datos con las columnas esperadas
       const tablaSalarial = data.map(row => ({
         clave_jornada: row.Clave_Jornada || row.clave_jornada || '',
-        jornal_base_g1: parseFloat(row.Jornal_Base_G1 || row.jornal_base_g1 || 0),
-        jornal_base_g2: parseFloat(row.Jornal_Base_G2 || row.jornal_base_g2 || 0),
-        prima_minima_coches: parseFloat(row.Prima_Minima_Coches || row.prima_minima_coches || 0),
-        coef_prima_menor120: parseFloat(row.Coef_Prima_Menor120 || row.coef_prima_menor120 || 0),
-        coef_prima_mayor120: parseFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120 || 0)
+        jornal_base_g1: parseEuropeanFloat(row.Jornal_Base_G1 || row.jornal_base_g1),
+        jornal_base_g2: parseEuropeanFloat(row.Jornal_Base_G2 || row.jornal_base_g2),
+        prima_minima_coches: parseEuropeanFloat(row.Prima_Minima_Coches || row.prima_minima_coches),
+        coef_prima_menor120: parseEuropeanFloat(row.Coef_Prima_Menor120 || row.coef_prima_menor120),
+        coef_prima_mayor120: parseEuropeanFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120)
       })).filter(item => item.clave_jornada);
 
       console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros`);

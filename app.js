@@ -2127,8 +2127,8 @@ window.agregarContratacionesManual = function(contrataciones) {
  */
 
 /**
- * Determina el tipo de día (LABORABLE, SABADO, FESTIVO, FEST. A LAB.)
- * basado en la fecha y jornada
+ * Determina el tipo de día basado en fecha y jornada
+ * Maneja jornadas nocturnas que cruzan medianoche (02-08, 20-02)
  */
 function determinarTipoDia(fecha, jornada) {
   // Parsear fecha dd/mm/yyyy
@@ -2137,8 +2137,6 @@ function determinarTipoDia(fecha, jornada) {
   const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
   const year = parseInt(parts[2]);
   const dateObj = new Date(year, month, day);
-
-  const dayOfWeek = dateObj.getDay(); // 0=Domingo, 6=Sábado
 
   // Festivos de España 2025 (ajustar según sea necesario)
   const festivos2025 = [
@@ -2152,21 +2150,49 @@ function determinarTipoDia(fecha, jornada) {
     '25/12/2025'  // Navidad
   ];
 
-  const fechaNormalizada = `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`;
-  const esFestivo = festivos2025.includes(fechaNormalizada);
+  const esFestivoFecha = (d) => {
+    const fechaNorm = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return festivos2025.includes(fechaNorm) || d.getDay() === 0; // Festivo oficial o domingo
+  };
 
-  // Lógica de determinación
-  if (esFestivo && dayOfWeek !== 0) {
-    // Festivo que cae en día laborable (no domingo)
-    return 'FEST. A LAB.';
-  } else if (esFestivo || dayOfWeek === 0) {
-    // Festivo o domingo
+  const dayOfWeek = dateObj.getDay(); // 0=Domingo, 6=Sábado
+  const esFestivoHoy = esFestivoFecha(dateObj);
+
+  // Para jornadas nocturnas (02-08, 20-02) que cruzan medianoche
+  if (jornada === '02-08' || jornada === '20-02') {
+    const diaSiguiente = new Date(dateObj);
+    diaSiguiente.setDate(diaSiguiente.getDate() + 1);
+    const esFestivoManana = esFestivoFecha(diaSiguiente);
+
+    if (jornada === '02-08') {
+      // Jornada 02-08: empieza de noche y termina por la mañana
+      if (esFestivoHoy && !esFestivoManana) {
+        return 'FEST-LAB';
+      } else if (esFestivoManana) {
+        return 'FESTIVO';
+      } else {
+        return 'LABORABLE';
+      }
+    } else if (jornada === '20-02') {
+      // Jornada 20-02: empieza de tarde y termina de madrugada
+      if (!esFestivoHoy && esFestivoManana) {
+        return 'LAB-FEST';
+      } else if (esFestivoHoy) {
+        return 'FESTIVO';
+      } else if (dayOfWeek === 6) {
+        return 'SABADO';
+      } else {
+        return 'LABORABLE';
+      }
+    }
+  }
+
+  // Para jornadas diurnas (08-14, 14-20)
+  if (esFestivoHoy) {
     return 'FESTIVO';
   } else if (dayOfWeek === 6) {
-    // Sábado
     return 'SABADO';
   } else {
-    // Lunes a viernes
     return 'LABORABLE';
   }
 }
