@@ -2243,8 +2243,8 @@ async function loadSueldometro() {
       // Normalizar jornada: "08 a 14" → "08-14", "20 a 02" → "20-02"
       let jornada = jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '').trim();
 
-      // 3.1 Buscar en mapeo de puestos
-      const mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
+      // 3.1 Buscar en mapeo de puestos usando el puesto original
+      let mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
 
       if (!mapeo) {
         console.warn(`⚠️ Puesto no encontrado en mapeo: "${jornal.puesto}"`);
@@ -2254,8 +2254,21 @@ async function loadSueldometro() {
         return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Puesto no mapeado' };
       }
 
-      const grupoSalarial = mapeo.grupo_salarial; // G1 o G2
-      const tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
+      // Obtener grupo salarial y tipo de operativa
+      let grupoSalarial = mapeo.grupo_salarial; // G1 o G2
+      let tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
+
+      // Forzar valores correctos para Conductor de Coches
+      if (jornal.puesto === 'Conductor de Coches') {
+        grupoSalarial = 'G2';
+        tipoOperativa = 'Coches';
+      }
+
+      // Normalizar nombre de puesto para display: "Conductor de Coches" → "Conductor de 2a"
+      let puestoDisplay = jornal.puesto;
+      if (jornal.puesto === 'Conductor de Coches') {
+        puestoDisplay = 'Conductor de 2a';
+      }
 
       // 3.2 Determinar tipo de día
       const tipoDia = determinarTipoDia(jornal.fecha, jornada);
@@ -2285,8 +2298,9 @@ async function loadSueldometro() {
       }
 
       // 3.5 Detectar si es Conductor OC (sin barco)
+      // OC usa "--" (dos guiones) en el campo buque
       const esConductorOC = jornal.puesto === 'Conductor de 1a' &&
-                            (!jornal.buque || jornal.buque.trim() === '' || jornal.buque.trim() === '__');
+                            (!jornal.buque || jornal.buque.trim() === '' || jornal.buque.trim() === '--');
 
       let salarioBase = 0;
       let prima = 0;
@@ -2305,12 +2319,16 @@ async function loadSueldometro() {
         salarioBase = salariosOC[jornada] || 0;
         prima = 0; // Sin prima para OC
       } else {
-        // Cálculo normal para SP y Contenedor
+        // Cálculo normal para SP y Contenedor/Coches
         salarioBase = grupoSalarial === 'G1' ? salarioInfo.jornal_base_g1 : salarioInfo.jornal_base_g2;
 
-        // 3.6 Calcular prima (por defecto 120 movimientos)
+        // 3.6 Calcular prima (por defecto 120 movimientos para Contenedor)
         if (tipoOperativa === 'Coches') {
+          // Para Coches: usar prima fija de la tabla
           prima = salarioInfo.prima_minima_coches;
+          if (index === 0) {
+            console.log(`🚗 Coches detectado - Prima: ${prima}€ (de prima_minima_coches)`);
+          }
         } else if (tipoOperativa === 'Contenedor') {
           // A partir de 120 movimientos (>=120) se usa coef_mayor
           prima = 120 * salarioInfo.coef_prima_mayor120;
@@ -2330,6 +2348,7 @@ async function loadSueldometro() {
 
       return {
         ...jornal,
+        puesto_display: puestoDisplay,
         salario_base: salarioBase,
         prima: prima,
         total: total,
@@ -2441,7 +2460,7 @@ async function loadSueldometro() {
                 <tr id="${rowId}" data-row-index="${idx}">
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
-                  <td>${j.puesto}${esOC ? ' <span class="badge-oc">OC</span>' : ''}</td>
+                  <td>${j.puesto_display}${esOC ? ' <span class="badge-oc">OC</span>' : ''}</td>
                   <td class="base-value">${j.salario_base.toFixed(2)}€</td>
                   <td>
                     ${esOC ? `
