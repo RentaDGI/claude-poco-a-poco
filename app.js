@@ -2320,6 +2320,8 @@ async function loadSueldometro() {
       if (index === 0) {
         console.log('🔍 DEBUG PRIMER JORNAL:');
         console.log('  Jornal:', jornal);
+        console.log('  Puesto original:', jornal.puesto);
+        console.log('  Puesto normalizado:', puestoLower);
         console.log('  Mapeo encontrado:', mapeo);
         console.log('  Tipo día:', tipoDia);
         console.log('  Clave jornada:', claveJornada);
@@ -2412,6 +2414,9 @@ async function loadSueldometro() {
         console.log('  Total:', total);
       }
 
+      // Detectar si incluye complemento para mostrar asterisco
+      const incluyeComplemento = (puestoLower === 'trincador' || puestoLower === 'trincador de coches');
+
       return {
         ...jornal,
         puesto_display: puestoDisplay,
@@ -2422,7 +2427,8 @@ async function loadSueldometro() {
         tipo_operativa: tipoOperativa,
         tipo_dia: tipoDia,
         clave_jornada: claveJornada,
-        es_jornal_fijo: esJornalFijo
+        es_jornal_fijo: esJornalFijo,
+        incluye_complemento: incluyeComplemento
       };
     });
 
@@ -2549,7 +2555,7 @@ async function loadSueldometro() {
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
                   <td>${j.puesto_display}${esOC ? ' <span class="badge-oc">OC</span>' : ''}</td>
-                  <td class="base-value">${j.salario_base.toFixed(2)}€</td>
+                  <td class="base-value">${j.salario_base.toFixed(2)}€${j.incluye_complemento ? '*' : ''}</td>
                   <td>
                     ${esOC ? `
                       <span class="text-muted">Fijo</span>
@@ -2586,6 +2592,9 @@ async function loadSueldometro() {
               `}).join('')}
             </tbody>
           </table>
+        </div>
+        <div class="complemento-nota" style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-radius: 4px;">
+          <strong>*</strong> Los puestos Trincador y Trincador de Coches incluyen un complemento de 46,94€ en el salario base.
         </div>
       `;
 
