@@ -50,7 +50,22 @@ const ENLACES_DATA = [
 
 // Noticias y avisos - Añadir contenido real aquí
 const NOTICIAS_DATA = [
-  { 
+  {
+    titulo: '💰 ¡NUEVA FUNCIONALIDAD: Sueldómetro!',
+    fecha: '05/11/2025',
+    contenido: `Llega la función más esperada: el <strong>Sueldómetro</strong>. Ahora puedes calcular automáticamente tu salario estimado por quincena:
+    <ul style="list-style-type: disc; margin-left: 20px; margin-top: 10px;">
+      <li style="margin-bottom: 5px;"><strong>Cálculo automático:</strong> Calcula tu salario base según tu puesto y jornada (laborable, festivo o sábado).</li>
+      <li style="margin-bottom: 5px;"><strong>Prima editable:</strong> Puedes modificar los movimientos o la prima directamente en la tabla.</li>
+      <li style="margin-bottom: 5px;"><strong>IRPF personalizable:</strong> Ajusta tu porcentaje de IRPF y ve el cálculo neto actualizado al instante.</li>
+      <li style="margin-bottom: 5px;"><strong>Complementos incluidos:</strong> Los puestos de Trincador y Trincador de Coches incluyen automáticamente su complemento de 46,94€ (marcado con *).</li>
+      <li style="margin-bottom: 5px;"><strong>Resumen por quincena:</strong> Visualiza totales de base, prima, bruto y neto organizados por quincenas.</li>
+      <li style="margin-bottom: 5px;"><strong>Estadísticas globales:</strong> Ve el total de jornales, total bruto/neto y promedio en la parte superior.</li>
+      <li><strong>Optimizado para móvil:</strong> Totalmente responsive y táctil para calcular desde cualquier dispositivo.</li>
+    </ul>
+    <p style="margin-top: 10px; font-weight: 600; color: #10b981;">¡Accede a "Sueldómetro" desde el menú lateral y comienza a calcular tus salarios!</p>`
+  },
+  {
   titulo: '⚙️ Actualización: Sistema de Contratación más Robusto',
     fecha: '04/11/2025',
     contenido: `Se ha implementado un sistema robusto para garantizar la visibilidad de tus asignaciones, incluso si el sistema principal falla:
@@ -2371,9 +2386,10 @@ async function loadSueldometro() {
 
         // Añadir complemento de 46,94€ para Trincador y Trincador de Coches
         if (puestoLower === 'trincador' || puestoLower === 'trincador de coches') {
-          console.log(`💰 ANTES complemento - Puesto: "${jornal.puesto}", puestoLower: "${puestoLower}", salarioBase: ${salarioBase}`);
           salarioBase += 46.94;
-          console.log(`💰 DESPUÉS complemento - Puesto: "${jornal.puesto}", salarioBase: ${salarioBase}`);
+          if (index === 0) {
+            console.log(`✅ Complemento aplicado a "${jornal.puesto}": +46.94€`);
+          }
         }
 
         // 3.6 Calcular prima (por defecto 120 movimientos para Contenedor)
