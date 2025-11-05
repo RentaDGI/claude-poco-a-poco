@@ -26,12 +26,11 @@ const SHEETS_CONFIG = {
   GID_TABLA_SALARIOS: '1710373929', // Pestaña: TABLA_SALARIOS (Para Sueldómetro)
 
   // URL de la hoja "censo_limpio"
-  URL_CENSO_LIMPIO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcJ5Irxl93zwDqehuLW7-MsuVtphRDtmF8Rwp-yueqcAYRfgrTtEdKDwX8WKkJj1m0rVJc8AncGN_A/pub?gid=1216182924&single=true&output=csv'
-// URLs del Sueldómetro (Añadidas para que las funciones las usen)
+  URL_CENSO_LIMPIO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcJ5Irxl93zwDqehuLW7-MsuVtphRDtmF8Rwp-yueqcAYRfgrTtEdKDwX8WKkJj1m0rVJc8AncGN_A/pub?gid=1216182924&single=true&output=csv',
+
+  // URLs del Sueldómetro (Añadidas para que las funciones las usen)
   URL_MAPEO_PUESTOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=418043978',
   URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929'
-};
-
 };
 
 /**
