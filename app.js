@@ -2254,11 +2254,11 @@ async function loadSueldometro() {
       // Normalizar jornada: "08 a 14" → "08-14", "20 a 02" → "20-02"
       let jornada = jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '').trim();
 
-      // Normalizar puesto para comparaciones case-insensitive
-      const puestoLower = jornal.puesto.toLowerCase();
+      // Normalizar puesto para comparaciones case-insensitive (eliminar espacios extra)
+      const puestoLower = jornal.puesto.trim().replace(/\s+/g, ' ').toLowerCase();
 
       // 3.1 Buscar en mapeo de puestos usando comparación case-insensitive
-      let mapeo = mapeoPuestos.find(m => m.puesto.toLowerCase() === puestoLower);
+      let mapeo = mapeoPuestos.find(m => m.puesto.trim().replace(/\s+/g, ' ').toLowerCase() === puestoLower);
 
       // Mapeo de fallback para puestos conocidos que pueden no estar en la hoja
       const mapeoFallback = {

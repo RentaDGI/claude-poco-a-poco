@@ -1476,6 +1476,17 @@ body::before {
   border-radius: 8px;
 }
 
+/* Estilos para valores bruto y neto */
+.bruto-value,
+.neto-value {
+  color: var(--puerto-green);
+}
+
+.bruto-value strong,
+.neto-value strong {
+  color: var(--puerto-green);
+}
+
 .quincena-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
