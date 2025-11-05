@@ -1576,8 +1576,22 @@ body::before {
   color: #9f1239;
 }
 
-/* Inputs de movimientos */
-.movimientos-input {
+/* Badge OC */
+.badge-oc {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: #3b82f6;
+  color: white;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
+
+/* Inputs de movimientos y prima */
+.movimientos-input,
+.prima-input {
   width: 80px;
   padding: 0.375rem 0.5rem;
   border: 2px solid #e2e8f0;
@@ -1590,14 +1604,16 @@ body::before {
   transition: all 0.2s;
 }
 
-.movimientos-input:focus {
+.movimientos-input:focus,
+.prima-input:focus {
   outline: none;
   border-color: var(--puerto-orange);
   background: white;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
 
-.movimientos-input:hover {
+.movimientos-input:hover,
+.prima-input:hover {
   border-color: #cbd5e1;
   background: white;
 }
