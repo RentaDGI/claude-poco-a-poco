@@ -2240,6 +2240,9 @@ async function loadSueldometro() {
 
     // 3. Calcular salario para cada jornal
     const jornalesConSalario = jornales.map((jornal, index) => {
+      // Normalizar jornada: "08 a 14" → "08-14", "20 a 02" → "20-02"
+      let jornada = jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '').trim();
+
       // 3.1 Buscar en mapeo de puestos
       const mapeo = mapeoPuestos.find(m => m.puesto === jornal.puesto);
 
@@ -2255,10 +2258,10 @@ async function loadSueldometro() {
       const tipoOperativa = mapeo.tipo_operativa; // Contenedor o Coches
 
       // 3.2 Determinar tipo de día
-      const tipoDia = determinarTipoDia(jornal.fecha, jornal.jornada);
+      const tipoDia = determinarTipoDia(jornal.fecha, jornada);
 
       // 3.3 Crear clave de jornada (ej: "08-14_LABORABLE")
-      const claveJornada = `${jornal.jornada}_${tipoDia}`;
+      const claveJornada = `${jornada}_${tipoDia}`;
 
       // 3.4 Buscar en tabla salarial
       const salarioInfo = tablaSalarial.find(s => s.clave_jornada === claveJornada);
