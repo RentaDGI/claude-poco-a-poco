@@ -541,14 +541,17 @@ const SheetsAPI = {
 
       // Obtener puertas
       const puertasResult = await this.getPuertas();
-      const puertas = puertasResult.puertas; 
+      const puertas = puertasResult.puertas;
 
-      // Separar puertas SP y OC
-      const puertasSP = puertas
+      // Filtrar SOLO puertas laborables (excluir Festivo) para el cálculo
+      const puertasLaborables = puertas.filter(p => p.jornada !== 'Festivo');
+
+      // Separar puertas SP y OC (solo laborables)
+      const puertasSP = puertasLaborables
         .map(p => parseInt(p.puertaSP))
         .filter(n => !isNaN(n) && n > 0);
 
-      const puertasOC = puertas
+      const puertasOC = puertasLaborables
         .map(p => parseInt(p.puertaOC))
         .filter(n => !isNaN(n) && n > 0);
 
