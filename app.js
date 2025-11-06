@@ -2544,6 +2544,10 @@ async function loadSueldometro() {
       // Verificar si hay jornales con complemento en esta quincena
       const tieneComplemento = jornalesConSalarioQuincena.some(j => j.incluye_complemento);
 
+      // Verificar si hay jornales OC en esta quincena
+      const tieneJornalesOC = jornalesConSalarioQuincena.some(j => j.es_jornal_fijo);
+      const badgeCenso = tieneJornalesOC ? ' <span class="badge-oc">OC</span>' : ' <span class="badge-green">SP</span>';
+
       const quincenaLabel = quincena === 1 ? '1-15' : '16-fin';
       const monthName = monthNames[month - 1];
       const emoji = quincena === 1 ? '📅' : '🗓️';
@@ -2586,7 +2590,7 @@ async function loadSueldometro() {
               <tr>
                 <th>Fecha</th>
                 <th>Jornada</th>
-                <th>Puesto</th>
+                <th>Puesto${badgeCenso}</th>
                 <th>Base</th>
                 <th>Movimientos</th>
                 <th>Prima</th>
@@ -2606,10 +2610,7 @@ async function loadSueldometro() {
                 <tr id="${rowId}" data-row-index="${idx}">
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
-                  <td>
-                    ${j.puesto_display}
-                    ${idx === 0 ? (esOC ? ' <span class="badge-oc">OC</span>' : ' <span class="badge-green">SP</span>') : ''}
-                  </td>
+                  <td>${j.puesto_display}</td>
                   <td class="base-value">${j.salario_base.toFixed(2)}€${j.incluye_complemento ? '*' : ''}</td>
                   <td>
                     ${esOC ? `
