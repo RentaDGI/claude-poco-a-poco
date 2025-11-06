@@ -1587,7 +1587,7 @@ body::before {
   color: #9f1239;
 }
 
-/* Badge OC */
+/* Badge OC y SP */
 .badge-oc {
   display: inline-block;
   padding: 0.125rem 0.375rem;
@@ -1604,6 +1604,18 @@ body::before {
   display: inline-block;
   padding: 0.125rem 0.375rem;
   background: #10b981; /* Color verde de tu paleta */
+  color: white;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
+
+.badge-sp {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: #10b981;
   color: white;
   border-radius: 4px;
   font-size: 0.6875rem;

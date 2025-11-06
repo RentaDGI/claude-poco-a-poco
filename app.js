@@ -2607,10 +2607,9 @@ async function loadSueldometro() {
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
                   <td>
-  ${j.puesto_display}
-  ${esOC ? ' <span class="badge-oc">OC</span>' : ' <span class="badge-green">SP</span>'}
-</td>
-
+                    ${j.puesto_display}
+                    ${idx === 0 ? (esOC ? ' <span class="badge-oc">OC</span>' : ' <span class="badge-green">SP</span>') : ''}
+                  </td>
                   <td class="base-value">${j.salario_base.toFixed(2)}€${j.incluye_complemento ? '*' : ''}</td>
                   <td>
                     ${esOC ? `
