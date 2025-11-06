@@ -3379,7 +3379,7 @@ Enviado desde Portal Estiba VLC`;
 
     try {
       // Crear enlace mailto
-      const mailtoLink = `mailto:your-email@example.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      const mailtoLink = `portalestibavlc@gmail.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
       // Abrir cliente de correo
       window.location.href = mailtoLink;
@@ -3406,6 +3406,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAddJornalManual();
   initReportJornal();
 });
+
 
 
 
