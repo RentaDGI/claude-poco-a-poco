@@ -13,6 +13,7 @@ const AppState = {
 // Datos estáticos - Enlaces actualizados con URLs reales
 const ENLACES_DATA = [
   // Formularios
+  { titulo: 'Reportar Jornal Faltante', url: '#', categoria: 'Formularios', color: 'blue', modal: 'report-jornal' },
   { titulo: 'Punto y HS', url: 'https://docs.google.com/forms/d/e/1FAIpQLSeGKl5gwKrcj110D_6xhHVo0bn7Fo56tneof68dRyS6xUrD7Q/viewform', categoria: 'Formularios', color: 'blue' },
   { titulo: 'Cambio Posición', url: 'https://docs.google.com/forms/d/e/1FAIpQLSe6V16kccSmyBAYCkDNphYAbD7dqe4ydHbVWu_zpXvnFFFxlA/viewform', categoria: 'Formularios', color: 'blue' },
   { titulo: 'Cambio IRPF', url: 'https://docs.google.com/forms/d/e/1FAIpQLSfDe2o5X_Bge14GA-bSBPRL7zpB2ZW_isBGGVFGAyvGkSAomQ/viewform', categoria: 'Formularios', color: 'blue' },
@@ -1787,8 +1788,22 @@ function renderEnlaces() {
       a.href = enlace.url;
       a.className = `enlace-btn ${enlace.color}`;
       a.textContent = enlace.titulo;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+
+      // Si tiene modal, abrir modal en lugar de link externo
+      if (enlace.modal) {
+        a.href = '#';
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const modal = document.getElementById(`${enlace.modal}-modal`);
+          if (modal) {
+            modal.style.display = 'flex';
+          }
+        });
+      } else {
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      }
+
       grid.appendChild(a);
     });
 
@@ -3013,9 +3028,157 @@ function initAddJornalManual() {
   });
 }
 
+/**
+ * Inicializa el modal para reportar jornales faltantes
+ */
+function initReportJornal() {
+  const modal = document.getElementById('report-jornal-modal');
+  const closeBtn = document.getElementById('close-report-modal');
+  const cancelBtn = document.getElementById('cancel-report');
+  const sendBtn = document.getElementById('send-report');
+
+  const chapaInput = document.getElementById('report-chapa');
+  const fechaInput = document.getElementById('report-fecha');
+  const puestoSelect = document.getElementById('report-puesto');
+  const puestoOtroGroup = document.getElementById('report-puesto-otro-group');
+  const puestoOtroInput = document.getElementById('report-puesto-otro');
+  const jornadaSelect = document.getElementById('report-jornada');
+  const empresaInput = document.getElementById('report-empresa');
+  const buqueInput = document.getElementById('report-buque');
+  const parteInput = document.getElementById('report-parte');
+
+  const errorMsg = document.getElementById('report-error');
+  const successMsg = document.getElementById('report-success');
+
+  if (!modal) return;
+
+  // Llenar chapa del usuario actual
+  const fillChapa = () => {
+    if (AppState.currentUser && chapaInput) {
+      chapaInput.value = AppState.currentUser;
+    }
+  };
+
+  // Mostrar campo "otro" si se selecciona
+  puestoSelect.addEventListener('change', () => {
+    if (puestoSelect.value === 'otro') {
+      puestoOtroGroup.style.display = 'block';
+      puestoOtroInput.required = true;
+    } else {
+      puestoOtroGroup.style.display = 'none';
+      puestoOtroInput.required = false;
+      puestoOtroInput.value = '';
+    }
+  });
+
+  // Cerrar modal
+  const cerrarModal = () => {
+    modal.style.display = 'none';
+    // Limpiar formulario
+    fechaInput.value = '';
+    puestoSelect.value = '';
+    puestoOtroGroup.style.display = 'none';
+    puestoOtroInput.value = '';
+    jornadaSelect.value = '';
+    empresaInput.value = '';
+    buqueInput.value = '';
+    parteInput.value = '1';
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+  };
+
+  closeBtn.addEventListener('click', cerrarModal);
+  cancelBtn.addEventListener('click', cerrarModal);
+
+  // Cerrar al hacer click fuera del modal
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      cerrarModal();
+    }
+  });
+
+  // Cuando se abre el modal, llenar la chapa
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'style') {
+        if (modal.style.display === 'flex') {
+          fillChapa();
+        }
+      }
+    });
+  });
+
+  observer.observe(modal, { attributes: true });
+
+  // Enviar reporte
+  sendBtn.addEventListener('click', async () => {
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+
+    // Validar campos requeridos
+    if (!fechaInput.value || !chapaInput.value || !puestoSelect.value ||
+        !jornadaSelect.value || !empresaInput.value || !parteInput.value) {
+      errorMsg.textContent = 'Por favor, completa todos los campos obligatorios (*)';
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    // Determinar puesto final
+    let puestoFinal = puestoSelect.value;
+    if (puestoSelect.value === 'otro') {
+      if (!puestoOtroInput.value.trim()) {
+        errorMsg.textContent = 'Por favor, especifica el puesto';
+        errorMsg.style.display = 'block';
+        return;
+      }
+      puestoFinal = puestoOtroInput.value.trim();
+    }
+
+    // Formatear fecha a DD/MM/YYYY
+    const [year, month, day] = fechaInput.value.split('-');
+    const fechaFormateada = `${day}/${month}/${year}`;
+
+    // Crear cuerpo del email en formato tabular (separado por tabulaciones)
+    const emailSubject = `Jornal Faltante - Chapa ${chapaInput.value}`;
+    const emailBody = `Jornal Faltante Reportado:
+
+Fecha\tChapa\tPuesto_Contratacion\tJornada\tEmpresa\tBuque\tParte
+${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value.trim()}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
+
+---
+Para copiar a la hoja de cálculo:
+${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value.trim()}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
+
+Enviado desde Portal Estiba VLC`;
+
+    try {
+      // Crear enlace mailto
+      const mailtoLink = `mailto:your-email@example.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+      // Abrir cliente de correo
+      window.location.href = mailtoLink;
+
+      // Mostrar mensaje de éxito
+      successMsg.textContent = '✅ Se ha abierto tu cliente de correo. Por favor, envía el email.';
+      successMsg.style.display = 'block';
+
+      // Cerrar modal después de 3 segundos
+      setTimeout(() => {
+        cerrarModal();
+      }, 3000);
+
+    } catch (error) {
+      console.error('❌ Error creando email:', error);
+      errorMsg.textContent = 'Error al crear el email. Inténtalo de nuevo.';
+      errorMsg.style.display = 'block';
+    }
+  });
+}
+
 // Inicializar al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
   initAddJornalManual();
+  initReportJornal();
 });
 
 

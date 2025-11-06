@@ -529,6 +529,75 @@
     </div>
   </div>
 
+  <!-- Modal para reportar jornal faltante -->
+  <div id="report-jornal-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📧 Reportar Jornal Faltante</h3>
+        <button id="close-report-modal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 1rem; color: var(--puerto-dark-blue); font-size: 0.875rem;">
+          Si algún jornal no se ha cargado correctamente, completa este formulario. Los datos se enviarán en formato tabular para facilitar la corrección.
+        </p>
+        <div class="form-group">
+          <label for="report-fecha">Fecha *</label>
+          <input type="date" id="report-fecha" required>
+        </div>
+        <div class="form-group">
+          <label for="report-chapa">Chapa *</label>
+          <input type="number" id="report-chapa" placeholder="Tu número de chapa" required readonly>
+        </div>
+        <div class="form-group">
+          <label for="report-puesto">Puesto Contratación *</label>
+          <select id="report-puesto" required>
+            <option value="">Selecciona un puesto</option>
+            <option value="Especialista">Especialista</option>
+            <option value="Conductor de 1a">Conductor de 1a</option>
+            <option value="Conductor de 2a">Conductor de 2a</option>
+            <option value="Conductor de Coches">Conductor de Coches</option>
+            <option value="Trincador">Trincador</option>
+            <option value="Trincador de Coches">Trincador de Coches</option>
+            <option value="otro">Otro (especificar)</option>
+          </select>
+        </div>
+        <div class="form-group" id="report-puesto-otro-group" style="display: none;">
+          <label for="report-puesto-otro">Especifica el puesto</label>
+          <input type="text" id="report-puesto-otro" placeholder="Ej: Gruista">
+        </div>
+        <div class="form-group">
+          <label for="report-jornada">Jornada *</label>
+          <select id="report-jornada" required>
+            <option value="">Selecciona una jornada</option>
+            <option value="02 a 08">02 a 08</option>
+            <option value="08 a 14">08 a 14</option>
+            <option value="14 a 20">14 a 20</option>
+            <option value="20 a 02">20 a 02</option>
+            <option value="Festivo">Festivo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="report-empresa">Empresa *</label>
+          <input type="text" id="report-empresa" placeholder="Ej: MSC, APM, CSP..." required>
+        </div>
+        <div class="form-group">
+          <label for="report-buque">Buque</label>
+          <input type="text" id="report-buque" placeholder="Ej: MSC SARA (opcional)">
+        </div>
+        <div class="form-group">
+          <label for="report-parte">Parte *</label>
+          <input type="number" id="report-parte" placeholder="Ej: 1" min="1" value="1" required>
+        </div>
+        <p id="report-error" class="error-message"></p>
+        <p id="report-success" class="success-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-report" class="btn-secondary">Cancelar</button>
+        <button id="send-report" class="btn-primary">Enviar Reporte</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Botón de instalación PWA flotante -->
   <button id="install-pwa-btn" class="install-pwa-btn" aria-label="Instalar aplicación">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
