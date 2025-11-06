@@ -2281,15 +2281,23 @@ async function loadSueldometro() {
   // Inicializar IRPF control
   const irpfControl = document.getElementById('sueldometro-irpf-control');
   const irpfInput = document.getElementById('irpf-input');
+  const irpfLockBtn = document.getElementById('irpf-lock-btn');
 
   // Cargar IRPF guardado o usar valor por defecto (15%)
   const irpfKey = `irpf_${AppState.currentUser}`;
+  const irpfLockKey = `irpf_locked_${AppState.currentUser}`;
   let irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+  let irpfLocked = localStorage.getItem(irpfLockKey) === 'true';
 
-  console.log(`💰 IRPF cargado: ${irpfPorcentaje}% (clave: ${irpfKey})`);
+  console.log(`💰 IRPF cargado: ${irpfPorcentaje}% (bloqueado: ${irpfLocked})`);
 
   if (irpfInput) {
     irpfInput.value = irpfPorcentaje;
+  }
+
+  if (irpfLockBtn) {
+    irpfLockBtn.textContent = irpfLocked ? '🔒' : '🔓';
+    irpfLockBtn.title = irpfLocked ? 'IRPF bloqueado - Click para desbloquear' : 'IRPF desbloqueado - Click para bloquear';
   }
 
   try {
@@ -2548,6 +2556,37 @@ async function loadSueldometro() {
 
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+    // Función auxiliar para calcular tarifa de horas de relevo
+    const calcularTarifaRelevo = (jornada, tipoDia) => {
+      // No hay relevo en 02-08
+      if (jornada === '02-08') return null;
+
+      // Tarifa especial para sábados 20-02 (20-21 sábado a 02-03 lunes)
+      if (jornada === '20-02' && tipoDia === 'SABADO') {
+        return 93.55;
+      }
+
+      // Tarifa normal para el resto de jornadas
+      return 64.31;
+    };
+
+    // Cargar valores bloqueados de localStorage
+    const lockedValuesKey = `locked_values_${AppState.currentUser}`;
+    let lockedValues = {};
+    try {
+      const stored = localStorage.getItem(lockedValuesKey);
+      if (stored) {
+        lockedValues = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn('Error cargando valores bloqueados:', e);
+    }
+
+    // Función para guardar valores bloqueados
+    const saveLockedValues = () => {
+      localStorage.setItem(lockedValuesKey, JSON.stringify(lockedValues));
+    };
+
     quincenasArray.forEach(({ year, month, quincena, jornales: jornalesQuincena }) => {
       const jornalesConSalarioQuincena = jornalesQuincena.map(j => {
         return jornalesConSalario.find(jcs =>
@@ -2615,6 +2654,7 @@ async function loadSueldometro() {
                 <th>Base</th>
                 <th>Movimientos</th>
                 <th>Prima</th>
+                <th>H. Relevo</th>
                 <th>Bruto</th>
                 <th>Neto</th>
               </tr>
@@ -2622,13 +2662,30 @@ async function loadSueldometro() {
             <tbody id="tbody-${year}-${month}-${quincena}">
               ${jornalesConSalarioQuincena.map((j, idx) => {
                 const rowId = `row-${year}-${month}-${quincena}-${idx}`;
-                const movimientosDefault = 120;
+                const lockKey = `${year}-${month}-${quincena}-${idx}`;
+
+                // Cargar valores bloqueados o usar defaults
+                const lockedData = lockedValues[lockKey] || {};
+                const movimientosValue = lockedData.movimientos !== undefined ? lockedData.movimientos : 120;
+                const primaValue = lockedData.prima !== undefined ? lockedData.prima : j.prima;
+                const horasRelevoValue = lockedData.horasRelevo !== undefined ? lockedData.horasRelevo : 0;
+                const movimientosLocked = lockedData.movimientosLocked || false;
+                const primaLocked = lockedData.primaLocked || false;
+
+                // Si hay valores bloqueados, recalcular el bruto con esos valores
+                let primaRecalculada = primaLocked ? primaValue : j.prima;
+
                 const esOC = j.es_jornal_fijo;
-                const bruto = j.total;
+
+                // Calcular tarifa de relevo
+                const tarifaRelevo = calcularTarifaRelevo(j.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), j.tipo_dia);
+                const importeRelevo = tarifaRelevo ? (horasRelevoValue * tarifaRelevo) : 0;
+
+                const bruto = j.salario_base + primaRecalculada + importeRelevo;
                 const neto = bruto * (1 - irpfPorcentaje / 100);
 
                 return `
-                <tr id="${rowId}" data-row-index="${idx}">
+                <tr id="${rowId}" data-row-index="${idx}" data-lock-key="${lockKey}">
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
                   <td>${j.puesto_display}</td>
@@ -2637,14 +2694,19 @@ async function loadSueldometro() {
                     ${esOC ? `
                       <span class="text-muted">Fijo</span>
                     ` : j.tipo_operativa === 'Contenedor' && !esOC ? `
-                      <input
-                        type="number"
-                        class="movimientos-input"
-                        value="${movimientosDefault}"
-                        min="0"
-                        step="1"
-                        data-jornal-index="${idx}"
-                      />
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <input
+                          type="number"
+                          class="movimientos-input"
+                          value="${movimientosValue}"
+                          min="0"
+                          step="1"
+                          data-jornal-index="${idx}"
+                          ${movimientosLocked ? 'disabled' : ''}
+                          style="${movimientosLocked ? 'opacity: 0.7; background: #f0f0f0;' : ''}"
+                        />
+                        <button class="lock-btn movimientos-lock-btn" data-jornal-index="${idx}" title="${movimientosLocked ? 'Desbloqueado' : 'Bloqueado'}">${movimientosLocked ? '🔒' : '🔓'}</button>
+                      </div>
                     ` : `
                       <span class="text-muted">N/A</span>
                     `}
@@ -2653,14 +2715,39 @@ async function loadSueldometro() {
                     ${esOC ? `
                       <span class="text-muted">—</span>
                     ` : `
-                      <input
-                        type="number"
-                        class="prima-input"
-                        value="${j.prima.toFixed(2)}"
-                        min="0"
-                        step="0.01"
-                        data-jornal-index="${idx}"
-                      />€
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <input
+                          type="number"
+                          class="prima-input"
+                          value="${primaValue.toFixed(2)}"
+                          min="0"
+                          step="0.01"
+                          data-jornal-index="${idx}"
+                          ${primaLocked ? 'disabled' : ''}
+                          style="${primaLocked ? 'opacity: 0.7; background: #f0f0f0;' : ''}"
+                        />€
+                        <button class="lock-btn prima-lock-btn" data-jornal-index="${idx}" title="${primaLocked ? 'Desbloqueado' : 'Bloqueado'}">${primaLocked ? '🔒' : '🔓'}</button>
+                      </div>
+                    `}
+                  </td>
+                  <td>
+                    ${tarifaRelevo !== null ? `
+                      <div style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem;">
+                        <input
+                          type="number"
+                          class="relevo-input"
+                          value="${horasRelevoValue}"
+                          min="0"
+                          max="24"
+                          step="1"
+                          data-jornal-index="${idx}"
+                          style="width: 50px;"
+                        />
+                        <span class="text-muted">× ${tarifaRelevo.toFixed(2)}€</span>
+                      </div>
+                      <div style="font-size: 0.75rem; color: #666;">= ${importeRelevo.toFixed(2)}€</div>
+                    ` : `
+                      <span class="text-muted">N/A</span>
                     `}
                   </td>
                   <td class="bruto-value"><strong>${bruto.toFixed(2)}€</strong></td>
@@ -2718,36 +2805,52 @@ async function loadSueldometro() {
           const jornalIndex = parseInt(e.target.dataset.jornalIndex);
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
 
-          // Recalcular prima según movimientos
+          // Guardar movimientos en localStorage
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          lockedValues[lockKey].movimientos = movimientos;
+          saveLockedValues();
+
+          // Recalcular prima según movimientos (solo si no está bloqueada)
+          const primaInput = row.querySelector('.prima-input');
+          const primaLockBtn = row.querySelector('.prima-lock-btn');
+          const primaLocked = primaLockBtn && primaLockBtn.textContent === '🔒';
+
           let nuevaPrima = 0;
           const salarioInfo = tablaSalarial.find(s => s.clave_jornada === jornal.clave_jornada);
 
-          if (salarioInfo && jornal.tipo_operativa === 'Contenedor') {
+          if (salarioInfo && jornal.tipo_operativa === 'Contenedor' && !primaLocked) {
             // A partir de 120 movimientos (>=120) se usa coef_mayor
             if (movimientos < 120) {
               nuevaPrima = movimientos * salarioInfo.coef_prima_menor120;
             } else {
               nuevaPrima = movimientos * salarioInfo.coef_prima_mayor120;
             }
+            // Actualizar el input de prima también
+            if (primaInput) primaInput.value = nuevaPrima.toFixed(2);
+            jornal.prima = nuevaPrima;
+          } else {
+            nuevaPrima = parseFloat(primaInput?.value || 0);
           }
 
-          const nuevoTotal = jornal.salario_base + nuevaPrima;
+          // Calcular horas de relevo
+          const relevoInput = row.querySelector('.relevo-input');
+          const horasRelevo = parseFloat(relevoInput?.value || 0);
+          const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
+
+          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo;
           const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
           row.classList.add('updating');
           setTimeout(() => row.classList.remove('updating'), 600);
 
-          // Actualizar el input de prima también
-          const primaInput = row.querySelector('.prima-input');
-          if (primaInput) primaInput.value = nuevaPrima.toFixed(2);
-
           row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
           row.querySelector('.neto-value strong').textContent = `${nuevoNeto.toFixed(2)}€`;
 
           // Actualizar el jornal en el array
-          jornal.prima = nuevaPrima;
           jornal.total = nuevoTotal;
 
           actualizarTotales();
@@ -2761,8 +2864,20 @@ async function loadSueldometro() {
           const jornalIndex = parseInt(e.target.dataset.jornalIndex);
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
 
-          const nuevoTotal = jornal.salario_base + nuevaPrima;
+          // Guardar prima en localStorage
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          lockedValues[lockKey].prima = nuevaPrima;
+          saveLockedValues();
+
+          // Calcular horas de relevo
+          const relevoInput = row.querySelector('.relevo-input');
+          const horasRelevo = parseFloat(relevoInput?.value || 0);
+          const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
+
+          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo;
           const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
@@ -2777,6 +2892,105 @@ async function loadSueldometro() {
           jornal.total = nuevoTotal;
 
           actualizarTotales();
+        });
+      });
+
+      // Event listener para inputs de horas de relevo
+      card.querySelectorAll('.relevo-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const horasRelevo = parseFloat(e.target.value) || 0;
+          const jornalIndex = parseInt(e.target.dataset.jornalIndex);
+          const jornal = jornalesConSalarioQuincena[jornalIndex];
+          const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
+
+          // Guardar horas de relevo en localStorage
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          lockedValues[lockKey].horasRelevo = horasRelevo;
+          saveLockedValues();
+
+          // Calcular tarifa de relevo
+          const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
+
+          // Obtener prima actual
+          const primaInput = row.querySelector('.prima-input');
+          const prima = parseFloat(primaInput?.value || 0);
+
+          const nuevoTotal = jornal.salario_base + prima + importeRelevo;
+          const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
+
+          // Actualizar la fila con animación
+          row.classList.add('updating');
+          setTimeout(() => row.classList.remove('updating'), 600);
+
+          // Actualizar el importe de relevo mostrado
+          const importeRelevoText = row.querySelector('td:nth-child(7) > div:last-child');
+          if (importeRelevoText) {
+            importeRelevoText.textContent = `= ${importeRelevo.toFixed(2)}€`;
+          }
+
+          row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.neto-value strong').textContent = `${nuevoNeto.toFixed(2)}€`;
+
+          // Actualizar el jornal en el array
+          jornal.total = nuevoTotal;
+
+          actualizarTotales();
+        });
+      });
+
+      // Event listener para botones de candado de movimientos
+      card.querySelectorAll('.movimientos-lock-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const jornalIndex = parseInt(e.target.dataset.jornalIndex);
+          const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
+          const movimientosInput = row.querySelector('.movimientos-input');
+
+          // Toggle lock
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          const isLocked = lockedValues[lockKey].movimientosLocked || false;
+          lockedValues[lockKey].movimientosLocked = !isLocked;
+          lockedValues[lockKey].movimientos = parseFloat(movimientosInput.value) || 120;
+          saveLockedValues();
+
+          // Actualizar UI
+          btn.textContent = !isLocked ? '🔒' : '🔓';
+          btn.title = !isLocked ? 'Desbloqueado' : 'Bloqueado';
+          movimientosInput.disabled = !isLocked;
+          movimientosInput.style.opacity = !isLocked ? '0.7' : '1';
+          movimientosInput.style.background = !isLocked ? '#f0f0f0' : '';
+
+          console.log(`${!isLocked ? '🔒' : '🔓'} Movimientos ${!isLocked ? 'bloqueados' : 'desbloqueados'} para ${lockKey}`);
+        });
+      });
+
+      // Event listener para botones de candado de prima
+      card.querySelectorAll('.prima-lock-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const jornalIndex = parseInt(e.target.dataset.jornalIndex);
+          const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
+          const primaInput = row.querySelector('.prima-input');
+
+          // Toggle lock
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          const isLocked = lockedValues[lockKey].primaLocked || false;
+          lockedValues[lockKey].primaLocked = !isLocked;
+          lockedValues[lockKey].prima = parseFloat(primaInput.value) || 0;
+          saveLockedValues();
+
+          // Actualizar UI
+          btn.textContent = !isLocked ? '🔒' : '🔓';
+          btn.title = !isLocked ? 'Desbloqueado' : 'Bloqueado';
+          primaInput.disabled = !isLocked;
+          primaInput.style.opacity = !isLocked ? '0.7' : '1';
+          primaInput.style.background = !isLocked ? '#f0f0f0' : '';
+
+          console.log(`${!isLocked ? '🔒' : '🔓'} Prima ${!isLocked ? 'bloqueada' : 'desbloqueada'} para ${lockKey}`);
         });
       });
     });
@@ -2852,6 +3066,18 @@ async function loadSueldometro() {
 
       // Evento 'blur' - cuando el usuario sale del input (más robusto)
       irpfInput.addEventListener('blur', actualizarIRPF);
+    }
+
+    // Event listener para botón de candado de IRPF
+    if (irpfLockBtn) {
+      irpfLockBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        irpfLocked = !irpfLocked;
+        localStorage.setItem(irpfLockKey, irpfLocked.toString());
+        irpfLockBtn.textContent = irpfLocked ? '🔒' : '🔓';
+        irpfLockBtn.title = irpfLocked ? 'IRPF bloqueado - Click para desbloquear' : 'IRPF desbloqueado - Click para bloquear';
+        console.log(`🔒 IRPF ${irpfLocked ? 'bloqueado' : 'desbloqueado'}`);
+      });
     }
 
   } catch (error) {
