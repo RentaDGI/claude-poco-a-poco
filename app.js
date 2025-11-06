@@ -405,6 +405,8 @@ async function loginUser(chapa, nombre = null) {
   navigateTo('dashboard');
 }
 
+// ... (el resto del archivo app.js se mantiene igual)
+
 /**
  * Actualiza la UI para usuario autenticado
  */
@@ -421,30 +423,49 @@ function updateUIForAuthenticatedUser() {
     const nombreUsuario = AppState.currentUserName || `Chapa ${AppState.currentUser}`;
     welcomeMsg.textContent = `Bienvenido, ${nombreUsuario}`;
 
-    // Obtener y mostrar posiciones hasta contratación
+    // Obtener y mostrar posiciones hasta contratación (laborable y festiva)
     SheetsAPI.getPosicionesHastaContratacion(AppState.currentUser)
-      .then(posiciones => {
-        if (posiciones !== null) {
-          const posicionInfo = document.createElement('span');
-          posicionInfo.style.display = 'block';
-          posicionInfo.style.marginTop = '0.5rem';
-          posicionInfo.style.fontSize = '0.95rem';
-          posicionInfo.style.color = '#FFFFFF'; // <-- MODIFICADO A BLANCO
-          posicionInfo.style.fontWeight = '600';
+      .then(posicionesObj => { // 'posicionesObj' es ahora { laborable: X, festiva: Y }
+        
+        // Limpiar cualquier span de posición anterior
+        const existingSpans = welcomeMsg.querySelectorAll('span');
+        existingSpans.forEach(span => span.remove());
 
-          if (posiciones === 0) {
-            posicionInfo.innerHTML = '🎉 ¡Estás en la última puerta contratada!';
-          } else {
-            // <-- MODIFICADO A BLANCO y negrita más fuerte
-            posicionInfo.innerHTML = `📍 Estás a <strong style="color: #FFFFFF; font-weight: 800;">${posiciones}</strong> posiciones de la puerta`;
+        if (posicionesObj) {
+          
+          // --- RENDERIZAR LÍNEA LABORABLE ---
+          if (posicionesObj.laborable !== null) {
+            const posicionInfoLab = document.createElement('span');
+            posicionInfoLab.style.display = 'block';
+            posicionInfoLab.style.marginTop = '0.5rem';
+            posicionInfoLab.style.fontSize = '0.95rem';
+            posicionInfoLab.style.color = '#FFFFFF';
+            posicionInfoLab.style.fontWeight = '600';
+
+            if (posicionesObj.laborable === 0) {
+              posicionInfoLab.innerHTML = '🎉 ¡Estás en la última puerta <strong>laborable</strong>!';
+            } else {
+              posicionInfoLab.innerHTML = `📍 Estás a <strong style="color: #FFFFFF; font-weight: 800;">${posicionesObj.laborable}</strong> posiciones de la puerta <strong>laborable</strong>`;
+            }
+            welcomeMsg.appendChild(posicionInfoLab);
           }
 
-          // Limpiar cualquier span anterior y agregar el nuevo
-          const existingSpan = welcomeMsg.querySelector('span');
-          if (existingSpan) {
-            existingSpan.remove();
+          // --- RENDERIZAR LÍNEA FESTIVA ---
+          if (posicionesObj.festiva !== null) {
+            const posicionInfoFest = document.createElement('span');
+            posicionInfoFest.style.display = 'block';
+            posicionInfoFest.style.marginTop = '0.25rem'; // Menos espacio entre las dos líneas
+            posicionInfoFest.style.fontSize = '0.95rem';
+            posicionInfoFest.style.color = '#FFFFFF';
+            posicionInfoFest.style.fontWeight = '600';
+
+            if (posicionesObj.festiva === 0) {
+              posicionInfoFest.innerHTML = '🎉 ¡Estás en la última puerta <strong>festiva</strong>!';
+            } else {
+              posicionInfoFest.innerHTML = `📍 Estás a <strong style="color: #FFFFFF; font-weight: 800;">${posicionesObj.festiva}</strong> posiciones de la puerta <strong>festiva</strong>`;
+            }
+            welcomeMsg.appendChild(posicionInfoFest);
           }
-          welcomeMsg.appendChild(posicionInfo);
         }
       })
       .catch(error => {
@@ -452,6 +473,8 @@ function updateUIForAuthenticatedUser() {
       });
   }
 }
+
+// ... (el resto de funciones de app.js se mantienen igual)
 
 /**
  * Maneja el logout
@@ -2383,10 +2406,10 @@ async function loadSueldometro() {
         // Conductores OC tienen salarios fijos sin prima (solo laborables)
         esJornalFijo = true;
         const salariosOC = {
-          '08-14': 176,
-          '14-20': 176,
-          '20-02': 243,
-          '02-08': 303
+          '08-14': 179.75,
+          '14-20': 179.75,
+          '20-02': 253.75,
+          '02-08': 321.75
         };
 
         salarioBase = salariosOC[jornada] || 0;
@@ -2583,7 +2606,11 @@ async function loadSueldometro() {
                 <tr id="${rowId}" data-row-index="${idx}">
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
-                  <td>${j.puesto_display}${esOC ? ' <span class="badge-oc">OC</span>' : ''}</td>
+                  <td>
+  ${j.puesto_display}
+  ${esOC ? ' <span class="badge-oc">OC</span>' : ' <span class="badge-green">SP</span>'}
+</td>
+
                   <td class="base-value">${j.salario_base.toFixed(2)}€${j.incluye_complemento ? '*' : ''}</td>
                   <td>
                     ${esOC ? `
@@ -2806,6 +2833,8 @@ async function loadSueldometro() {
     loading.classList.add('hidden');
   }
 }
+
+
 
 
 

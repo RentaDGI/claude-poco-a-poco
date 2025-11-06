@@ -524,81 +524,110 @@ const SheetsAPI = {
    * Calcula posiciones hasta contratación
    * (Actualizado para usar el nuevo getPosicionChapa y el nuevo getPuertas)
    */
+  // ... (el resto del archivo sheets.js se mantiene igual)
+
+  /**
+   * Calcula posiciones hasta contratación (Laborable y Festiva)
+   * (Actualizado para usar el nuevo getPosicionChapa y el nuevo getPuertas)
+   * Devuelve un objeto: { laborable: X, festiva: Y }
+   */
   async getPosicionesHastaContratacion(chapa) {
     try {
-      // Obtener posición del usuario
+      // 1. Obtener Posición del Usuario y Tipo de Censo
       const posicionUsuario = await this.getPosicionChapa(chapa);
       if (!posicionUsuario) {
         return null;
       }
 
-      // Determinar si el usuario está en censo SP o OC
       const LIMITE_SP = 449;
       const INICIO_OC = 450;
       const FIN_OC = 535;
 
       const esUsuarioSP = posicionUsuario <= LIMITE_SP;
 
-      // Obtener puertas
+      // 2. Obtener Puertas
       const puertasResult = await this.getPuertas();
       const puertas = puertasResult.puertas;
 
-      // Filtrar SOLO puertas laborables (excluir Festivo) para el cálculo
+      // --- 3. CÁLCULO PARA PUERTAS LABORABLES ---
       const puertasLaborables = puertas.filter(p => p.jornada !== 'Festivo');
-
-      // Separar puertas SP y OC (solo laborables)
-      const puertasSP = puertasLaborables
+      
+      const puertasSP_Lab = puertasLaborables
         .map(p => parseInt(p.puertaSP))
         .filter(n => !isNaN(n) && n > 0);
-
-      const puertasOC = puertasLaborables
+      
+      const puertasOC_Lab = puertasLaborables
         .map(p => parseInt(p.puertaOC))
         .filter(n => !isNaN(n) && n > 0);
 
-      let posicionesFaltantes;
+      let posicionesLaborable = null;
 
       if (esUsuarioSP) {
-        // Usuario en censo SP (1-449)
-        if (puertasSP.length === 0) {
-          return null; // No hay puertas SP contratadas
+        if (puertasSP_Lab.length > 0) {
+          const ultimaPuertaSP_Lab = Math.max(...puertasSP_Lab);
+          if (posicionUsuario > ultimaPuertaSP_Lab) {
+            posicionesLaborable = posicionUsuario - ultimaPuertaSP_Lab;
+          } else {
+            posicionesLaborable = (LIMITE_SP - ultimaPuertaSP_Lab) + posicionUsuario;
+          }
         }
-
-        const ultimaPuertaSP = Math.max(...puertasSP);
-
-        // Calcular distancia circular en censo SP
-        if (posicionUsuario > ultimaPuertaSP) {
-          // Usuario está después de la última puerta
-          posicionesFaltantes = posicionUsuario - ultimaPuertaSP;
-        } else {
-          // Usuario está antes de la última puerta (dar la vuelta en censo SP)
-          posicionesFaltantes = (LIMITE_SP - ultimaPuertaSP) + posicionUsuario;
-        }
-
-      } else {
-        // Usuario en censo OC (450-535)
-        if (puertasOC.length === 0) {
-          return null; // No hay puertas OC contratadas
-        }
-
-        const ultimaPuertaOC = Math.max(...puertasOC);
-
-        // Calcular distancia circular en censo OC
-        if (posicionUsuario > ultimaPuertaOC) {
-          // Usuario está después de la última puerta
-          posicionesFaltantes = posicionUsuario - ultimaPuertaOC;
-        } else {
-          // Usuario está antes de la última puerta (dar la vuelta en censo OC)
-          posicionesFaltantes = (FIN_OC - ultimaPuertaOC) + (posicionUsuario - INICIO_OC + 1);
+      } else { // esUsuarioOC
+        if (puertasOC_Lab.length > 0) {
+          const ultimaPuertaOC_Lab = Math.max(...puertasOC_Lab);
+          if (posicionUsuario > ultimaPuertaOC_Lab) {
+            posicionesLaborable = posicionUsuario - ultimaPuertaOC_Lab;
+          } else {
+            posicionesLaborable = (FIN_OC - ultimaPuertaOC_Lab) + (posicionUsuario - INICIO_OC + 1);
+          }
         }
       }
 
-      return posicionesFaltantes;
+      // --- 4. CÁLCULO PARA PUERTAS FESTIVAS ---
+      const puertasFestivas = puertas.filter(p => p.jornada === 'Festivo');
+      
+      const puertasSP_Fest = puertasFestivas
+        .map(p => parseInt(p.puertaSP))
+        .filter(n => !isNaN(n) && n > 0);
+
+      const puertasOC_Fest = puertasFestivas
+        .map(p => parseInt(p.puertaOC))
+        .filter(n => !isNaN(n) && n > 0);
+      
+      let posicionesFestiva = null;
+
+      if (esUsuarioSP) {
+        if (puertasSP_Fest.length > 0) {
+          const ultimaPuertaSP_Fest = Math.max(...puertasSP_Fest);
+          if (posicionUsuario > ultimaPuertaSP_Fest) {
+            posicionesFestiva = posicionUsuario - ultimaPuertaSP_Fest;
+          } else {
+            posicionesFestiva = (LIMITE_SP - ultimaPuertaSP_Fest) + posicionUsuario;
+          }
+        }
+      } else { // esUsuarioOC
+        if (puertasOC_Fest.length > 0) {
+          const ultimaPuertaOC_Fest = Math.max(...puertasOC_Fest);
+          if (posicionUsuario > ultimaPuertaOC_Fest) {
+            posicionesFestiva = posicionUsuario - ultimaPuertaOC_Fest;
+          } else {
+            posicionesFestiva = (FIN_OC - ultimaPuertaOC_Fest) + (posicionUsuario - INICIO_OC + 1);
+          }
+        }
+      }
+
+      // 5. Devolver el objeto con ambos resultados
+      return {
+        laborable: posicionesLaborable,
+        festiva: posicionesFestiva
+      };
 
     } catch (error) {
       console.error('Error calculando posiciones hasta contratación:', error);
       return null;
     }
   },
+
+  // ... (el resto de funciones de sheets.js se mantienen igual)
 
   /**
    * [FRÁGIL] Obtiene mensajes del foro desde Google Sheet
@@ -1241,4 +1270,5 @@ function clearSheetsCache() {
 // Exponer API globalmente
 window.SheetsAPI = SheetsAPI;
 window.clearSheetsCache = clearSheetsCache;
+
 

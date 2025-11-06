@@ -1599,6 +1599,18 @@ body::before {
   margin-left: 0.25rem;
   vertical-align: middle;
 }
+/* Badge Verde (para SP o éxito) */
+.badge-green {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: #10b981; /* Color verde de tu paleta */
+  color: white;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
 
 /* Inputs de movimientos y prima */
 .movimientos-input,
@@ -1788,6 +1800,7 @@ body::before {
   .badge {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
+
   }
 
   /* Valores bruto/neto más visibles */
