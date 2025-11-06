@@ -1406,7 +1406,10 @@ function createQuincenaCard(year, month, quincena, jornales) {
             ${jornales.map(row => `
               <tr>
                 <td style="white-space: nowrap;"><strong>${row.fecha}</strong></td>
-                <td style="white-space: nowrap;">${row.puesto}</td>
+                <td style="white-space: nowrap;">
+                  ${row.puesto}
+                  ${row.manual ? '<span class="badge-manual" title="Añadido manualmente">Manual</span>' : ''}
+                </td>
                 <td style="white-space: nowrap;">${row.jornada}</td>
                 <td style="white-space: nowrap;">${row.empresa}</td>
                 <td style="white-space: nowrap;">${row.buque}</td>
@@ -2850,9 +2853,170 @@ async function loadSueldometro() {
   }
 }
 
+/**
+ * Inicializar funcionalidad de añadir jornal manual
+ */
+function initAddJornalManual() {
+  const addBtn = document.getElementById('add-jornal-btn');
+  const modal = document.getElementById('add-jornal-modal');
+  const closeBtn = document.getElementById('close-jornal-modal');
+  const cancelBtn = document.getElementById('cancel-jornal');
+  const saveBtn = document.getElementById('save-jornal');
 
+  const fechaInput = document.getElementById('jornal-fecha');
+  const jornadaSelect = document.getElementById('jornal-jornada');
+  const puestoSelect = document.getElementById('jornal-puesto');
+  const puestoOtroGroup = document.getElementById('jornal-puesto-otro-group');
+  const puestoOtroInput = document.getElementById('jornal-puesto-otro');
+  const empresaInput = document.getElementById('jornal-empresa');
+  const buqueInput = document.getElementById('jornal-buque');
+  const parteInput = document.getElementById('jornal-parte');
 
+  const errorMsg = document.getElementById('jornal-error');
+  const successMsg = document.getElementById('jornal-success');
 
+  if (!addBtn || !modal) return;
+
+  // Abrir modal
+  addBtn.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    // Limpiar formulario
+    fechaInput.value = '';
+    jornadaSelect.value = '';
+    puestoSelect.value = '';
+    puestoOtroGroup.style.display = 'none';
+    puestoOtroInput.value = '';
+    empresaInput.value = '';
+    buqueInput.value = '';
+    parteInput.value = '';
+    errorMsg.textContent = '';
+    errorMsg.style.display = 'none';
+    successMsg.textContent = '';
+    successMsg.style.display = 'none';
+  });
+
+  // Cerrar modal
+  const cerrarModal = () => {
+    modal.style.display = 'none';
+  };
+
+  closeBtn.addEventListener('click', cerrarModal);
+  cancelBtn.addEventListener('click', cerrarModal);
+
+  // Cerrar al hacer clic fuera del modal
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) cerrarModal();
+  });
+
+  // Mostrar/ocultar campo "Otro puesto"
+  puestoSelect.addEventListener('change', () => {
+    if (puestoSelect.value === 'otro') {
+      puestoOtroGroup.style.display = 'block';
+    } else {
+      puestoOtroGroup.style.display = 'none';
+    }
+  });
+
+  // Guardar jornal
+  saveBtn.addEventListener('click', async () => {
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+
+    // Validar campos obligatorios
+    if (!fechaInput.value || !jornadaSelect.value || !puestoSelect.value || !empresaInput.value) {
+      errorMsg.textContent = 'Por favor, completa todos los campos obligatorios (*)';
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    // Obtener puesto final
+    let puestoFinal = puestoSelect.value;
+    if (puestoFinal === 'otro') {
+      if (!puestoOtroInput.value.trim()) {
+        errorMsg.textContent = 'Por favor, especifica el puesto';
+        errorMsg.style.display = 'block';
+        return;
+      }
+      puestoFinal = puestoOtroInput.value.trim();
+    }
+
+    // Formatear fecha a DD/MM/YYYY
+    const fechaParts = fechaInput.value.split('-'); // YYYY-MM-DD
+    const fechaFormateada = `${fechaParts[2]}/${fechaParts[1]}/${fechaParts[0]}`;
+
+    // Crear objeto jornal
+    const nuevoJornal = {
+      fecha: fechaFormateada,
+      jornada: jornadaSelect.value,
+      puesto: puestoFinal,
+      empresa: empresaInput.value.trim(),
+      buque: buqueInput.value.trim() || '--',
+      parte: parteInput.value || '1',
+      manual: true // Marcar como añadido manualmente
+    };
+
+    console.log('💾 Guardando jornal manual:', nuevoJornal);
+
+    try {
+      // Guardar en localStorage
+      let historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+
+      // Verificar duplicados
+      const existe = historico.some(j =>
+        j.fecha === nuevoJornal.fecha &&
+        j.jornada === nuevoJornal.jornada &&
+        j.puesto === nuevoJornal.puesto
+      );
+
+      if (existe) {
+        errorMsg.textContent = 'Ya existe un jornal con estos datos';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      // Añadir nuevo jornal
+      historico.push(nuevoJornal);
+
+      // Ordenar por fecha (más recientes primero)
+      historico.sort((a, b) => {
+        const [dA, mA, yA] = a.fecha.split('/');
+        const [dB, mB, yB] = b.fecha.split('/');
+        const dateA = new Date(yA, mA - 1, dA);
+        const dateB = new Date(yB, mB - 1, dB);
+        return dateB - dateA;
+      });
+
+      // Guardar en localStorage
+      localStorage.setItem('jornales_historico', JSON.stringify(historico));
+
+      console.log('✅ Jornal guardado correctamente');
+
+      // Mostrar mensaje de éxito
+      successMsg.textContent = '✅ Jornal añadido correctamente';
+      successMsg.style.display = 'block';
+
+      // Recargar automáticamente las vistas
+      setTimeout(async () => {
+        // Recargar Mis Jornales si estamos en esa página
+        if (document.getElementById('page-jornales').classList.contains('active')) {
+          await loadJornales();
+        }
+
+        cerrarModal();
+      }, 1500);
+
+    } catch (error) {
+      console.error('❌ Error guardando jornal:', error);
+      errorMsg.textContent = 'Error al guardar el jornal. Inténtalo de nuevo.';
+      errorMsg.style.display = 'block';
+    }
+  });
+}
+
+// Inicializar al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+  initAddJornalManual();
+});
 
 
 

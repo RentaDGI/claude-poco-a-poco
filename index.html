@@ -281,6 +281,13 @@
         </div>
         <div id="jornales-content"></div>
       </div>
+
+      <!-- Botón flotante para añadir jornal manual -->
+      <button id="add-jornal-btn" class="fab-btn" aria-label="Añadir jornal manual" title="Añadir jornal manualmente">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
     </section>
 
     <!-- PÁGINA SUELDÓMETRO -->
@@ -454,6 +461,70 @@
       <div class="modal-footer">
         <button id="cancel-password-change" class="btn-secondary">Cancelar</button>
         <button id="confirm-password-change" class="btn-primary">Cambiar Contraseña</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para añadir jornal manual -->
+  <div id="add-jornal-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ Añadir Jornal Manual</h3>
+        <button id="close-jornal-modal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 1rem; color: var(--puerto-dark-blue); font-size: 0.875rem;">
+          Introduce los datos de tu jornal. Este jornal se guardará localmente y se sincronizará con el Sueldómetro.
+        </p>
+        <div class="form-group">
+          <label for="jornal-fecha">Fecha *</label>
+          <input type="date" id="jornal-fecha" required>
+        </div>
+        <div class="form-group">
+          <label for="jornal-jornada">Jornada *</label>
+          <select id="jornal-jornada" required>
+            <option value="">Selecciona una jornada</option>
+            <option value="02 a 08">02 a 08</option>
+            <option value="08 a 14">08 a 14</option>
+            <option value="14 a 20">14 a 20</option>
+            <option value="20 a 02">20 a 02</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="jornal-puesto">Puesto *</label>
+          <select id="jornal-puesto" required>
+            <option value="">Selecciona un puesto</option>
+            <option value="Especialista">Especialista</option>
+            <option value="Conductor de 1a">Conductor de 1a</option>
+            <option value="Conductor de 2a">Conductor de 2a</option>
+            <option value="Conductor de Coches">Conductor de Coches</option>
+            <option value="Trincador">Trincador</option>
+            <option value="Trincador de Coches">Trincador de Coches</option>
+            <option value="otro">Otro (especificar)</option>
+          </select>
+        </div>
+        <div class="form-group" id="jornal-puesto-otro-group" style="display: none;">
+          <label for="jornal-puesto-otro">Especifica el puesto</label>
+          <input type="text" id="jornal-puesto-otro" placeholder="Ej: Gruista">
+        </div>
+        <div class="form-group">
+          <label for="jornal-empresa">Empresa *</label>
+          <input type="text" id="jornal-empresa" placeholder="Ej: MSC, APM, CSP..." required>
+        </div>
+        <div class="form-group">
+          <label for="jornal-buque">Buque</label>
+          <input type="text" id="jornal-buque" placeholder="Ej: MSC SARA (opcional)">
+        </div>
+        <div class="form-group">
+          <label for="jornal-parte">Parte</label>
+          <input type="number" id="jornal-parte" placeholder="Ej: 1" min="1">
+        </div>
+        <p id="jornal-error" class="error-message"></p>
+        <p id="jornal-success" class="success-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-jornal" class="btn-secondary">Cancelar</button>
+        <button id="save-jornal" class="btn-primary">Guardar Jornal</button>
       </div>
     </div>
   </div>
