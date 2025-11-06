@@ -422,7 +422,7 @@ function updateUIForAuthenticatedUser() {
   const welcomeMsg = document.getElementById('welcome-message');
   if (welcomeMsg) {
     const nombreUsuario = AppState.currentUserName || `Chapa ${AppState.currentUser}`;
-    welcomeMsg.textContent = `Bienvenido, ${nombreUsuario}`;
+    welcomeMsg.textContent = `Bienvenido/a, ${nombreUsuario}`;
 
     // Obtener y mostrar posiciones hasta contratación (laborable y festiva)
     SheetsAPI.getPosicionesHastaContratacion(AppState.currentUser)
@@ -2293,6 +2293,12 @@ async function loadSueldometro() {
 
   if (irpfInput) {
     irpfInput.value = irpfPorcentaje;
+    irpfInput.disabled = irpfLocked;
+    if (irpfLocked) {
+      irpfInput.style.opacity = '0.7';
+      irpfInput.style.background = '#f0f0f0';
+      irpfInput.style.cursor = 'not-allowed';
+    }
   }
 
   if (irpfLockBtn) {
@@ -2618,14 +2624,18 @@ async function loadSueldometro() {
         <div class="quincena-header">
           <h3>${emoji} ${quincenaLabel} ${monthName.toUpperCase()} ${year}</h3>
           <div class="quincena-total">
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
-              <div>
-                <span class="total-label">Bruto:</span>
-                <span class="total-value bruto-value">${totalQuincenaBruto.toFixed(2)}€</span>
+            <div class="total-box bruto-box">
+              <div class="total-icon">💰</div>
+              <div class="total-content">
+                <div class="total-label">Total Bruto</div>
+                <div class="total-value bruto-value">${totalQuincenaBruto.toFixed(2)}€</div>
               </div>
-              <div>
-                <span class="total-label">Neto:</span>
-                <span class="total-value neto-value">${totalQuincenaNeto.toFixed(2)}€</span>
+            </div>
+            <div class="total-box neto-box">
+              <div class="total-icon">💵</div>
+              <div class="total-content">
+                <div class="total-label">Total Neto (${irpfPorcentaje}%)</div>
+                <div class="total-value neto-value">${totalQuincenaNeto.toFixed(2)}€</div>
               </div>
             </div>
           </div>
@@ -2948,22 +2958,37 @@ async function loadSueldometro() {
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
           const movimientosInput = row.querySelector('.movimientos-input');
+          const primaInput = row.querySelector('.prima-input');
+          const primaLockBtn = row.querySelector('.prima-lock-btn');
 
           // Toggle lock
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           const isLocked = lockedValues[lockKey].movimientosLocked || false;
           lockedValues[lockKey].movimientosLocked = !isLocked;
+          lockedValues[lockKey].primaLocked = !isLocked; // Sincronizar con prima
           lockedValues[lockKey].movimientos = parseFloat(movimientosInput.value) || 120;
+          lockedValues[lockKey].prima = parseFloat(primaInput.value) || 0;
           saveLockedValues();
 
-          // Actualizar UI
+          // Actualizar UI de movimientos
           btn.textContent = !isLocked ? '🔒' : '🔓';
-          btn.title = !isLocked ? 'Desbloqueado' : 'Bloqueado';
+          btn.title = !isLocked ? 'Bloqueado - Click para desbloquear' : 'Desbloqueado - Click para bloquear';
           movimientosInput.disabled = !isLocked;
           movimientosInput.style.opacity = !isLocked ? '0.7' : '1';
           movimientosInput.style.background = !isLocked ? '#f0f0f0' : '';
 
-          console.log(`${!isLocked ? '🔒' : '🔓'} Movimientos ${!isLocked ? 'bloqueados' : 'desbloqueados'} para ${lockKey}`);
+          // Actualizar UI de prima también
+          if (primaLockBtn) {
+            primaLockBtn.textContent = !isLocked ? '🔒' : '🔓';
+            primaLockBtn.title = !isLocked ? 'Bloqueado - Click para desbloquear' : 'Desbloqueado - Click para bloquear';
+          }
+          if (primaInput) {
+            primaInput.disabled = !isLocked;
+            primaInput.style.opacity = !isLocked ? '0.7' : '1';
+            primaInput.style.background = !isLocked ? '#f0f0f0' : '';
+          }
+
+          console.log(`${!isLocked ? '🔒' : '🔓'} Movimientos y prima ${!isLocked ? 'bloqueados' : 'desbloqueados'} para ${lockKey}`);
         });
       });
 
@@ -2975,22 +3000,39 @@ async function loadSueldometro() {
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
           const primaInput = row.querySelector('.prima-input');
+          const movimientosInput = row.querySelector('.movimientos-input');
+          const movimientosLockBtn = row.querySelector('.movimientos-lock-btn');
 
           // Toggle lock
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           const isLocked = lockedValues[lockKey].primaLocked || false;
           lockedValues[lockKey].primaLocked = !isLocked;
+          lockedValues[lockKey].movimientosLocked = !isLocked; // Sincronizar con movimientos
           lockedValues[lockKey].prima = parseFloat(primaInput.value) || 0;
+          if (movimientosInput) {
+            lockedValues[lockKey].movimientos = parseFloat(movimientosInput.value) || 120;
+          }
           saveLockedValues();
 
-          // Actualizar UI
+          // Actualizar UI de prima
           btn.textContent = !isLocked ? '🔒' : '🔓';
-          btn.title = !isLocked ? 'Desbloqueado' : 'Bloqueado';
+          btn.title = !isLocked ? 'Bloqueado - Click para desbloquear' : 'Desbloqueado - Click para bloquear';
           primaInput.disabled = !isLocked;
           primaInput.style.opacity = !isLocked ? '0.7' : '1';
           primaInput.style.background = !isLocked ? '#f0f0f0' : '';
 
-          console.log(`${!isLocked ? '🔒' : '🔓'} Prima ${!isLocked ? 'bloqueada' : 'desbloqueada'} para ${lockKey}`);
+          // Actualizar UI de movimientos también
+          if (movimientosLockBtn) {
+            movimientosLockBtn.textContent = !isLocked ? '🔒' : '🔓';
+            movimientosLockBtn.title = !isLocked ? 'Bloqueado - Click para desbloquear' : 'Desbloqueado - Click para bloquear';
+          }
+          if (movimientosInput) {
+            movimientosInput.disabled = !isLocked;
+            movimientosInput.style.opacity = !isLocked ? '0.7' : '1';
+            movimientosInput.style.background = !isLocked ? '#f0f0f0' : '';
+          }
+
+          console.log(`${!isLocked ? '🔒' : '🔓'} Prima y movimientos ${!isLocked ? 'bloqueados' : 'desbloqueados'} para ${lockKey}`);
         });
       });
     });
@@ -3069,13 +3111,28 @@ async function loadSueldometro() {
     }
 
     // Event listener para botón de candado de IRPF
-    if (irpfLockBtn) {
+    if (irpfLockBtn && irpfInput) {
       irpfLockBtn.addEventListener('click', (e) => {
         e.preventDefault();
         irpfLocked = !irpfLocked;
         localStorage.setItem(irpfLockKey, irpfLocked.toString());
+
+        // Actualizar UI del botón
         irpfLockBtn.textContent = irpfLocked ? '🔒' : '🔓';
         irpfLockBtn.title = irpfLocked ? 'IRPF bloqueado - Click para desbloquear' : 'IRPF desbloqueado - Click para bloquear';
+
+        // Actualizar UI del input
+        irpfInput.disabled = irpfLocked;
+        if (irpfLocked) {
+          irpfInput.style.opacity = '0.7';
+          irpfInput.style.background = '#f0f0f0';
+          irpfInput.style.cursor = 'not-allowed';
+        } else {
+          irpfInput.style.opacity = '1';
+          irpfInput.style.background = 'white';
+          irpfInput.style.cursor = '';
+        }
+
         console.log(`🔒 IRPF ${irpfLocked ? 'bloqueado' : 'desbloqueado'}`);
       });
     }
