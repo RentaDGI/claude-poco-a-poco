@@ -2267,6 +2267,9 @@ async function loadSueldometro() {
   // Cargar IRPF guardado o usar valor por defecto (15%)
   const irpfKey = `irpf_${AppState.currentUser}`;
   let irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+
+  console.log(`💰 IRPF cargado: ${irpfPorcentaje}% (clave: ${irpfKey})`);
+
   if (irpfInput) {
     irpfInput.value = irpfPorcentaje;
   }
@@ -2760,64 +2763,77 @@ async function loadSueldometro() {
       });
     });
 
-    // Event listener para cambios en IRPF
-    if (irpfInput) {
-      irpfInput.addEventListener('change', (e) => {
-        const nuevoIRPF = parseFloat(e.target.value) || 0;
+    // Función para actualizar IRPF y persistir en localStorage
+    const actualizarIRPF = (e) => {
+      const nuevoIRPF = parseFloat(e.target.value) || 0;
 
-        // Validar rango (0-50%)
-        if (nuevoIRPF < 0 || nuevoIRPF > 50) {
-          alert('El porcentaje de IRPF debe estar entre 0% y 50%');
-          e.target.value = irpfPorcentaje;
-          return;
-        }
+      // Validar rango (0-50%)
+      if (nuevoIRPF < 0 || nuevoIRPF > 50) {
+        alert('El porcentaje de IRPF debe estar entre 0% y 50%');
+        e.target.value = irpfPorcentaje;
+        return;
+      }
 
-        // Guardar en localStorage
-        localStorage.setItem(irpfKey, nuevoIRPF.toString());
-        irpfPorcentaje = nuevoIRPF;
+      // No hacer nada si el valor no cambió
+      if (nuevoIRPF === irpfPorcentaje) {
+        return;
+      }
 
-        console.log(`💰 IRPF actualizado a ${nuevoIRPF}%`);
+      // Guardar en localStorage
+      localStorage.setItem(irpfKey, nuevoIRPF.toString());
+      irpfPorcentaje = nuevoIRPF;
 
-        // Actualizar todos los valores neto sin recargar la página
-        // 1. Actualizar estadísticas globales
-        const totalGlobalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
-        const totalGlobalNeto = totalGlobalBruto * (1 - irpfPorcentaje / 100);
+      console.log(`💰 IRPF actualizado y guardado: ${nuevoIRPF}%`);
+      console.log(`💾 Guardado en localStorage con clave: ${irpfKey}`);
 
-        const statCards = stats.querySelectorAll('.stat-card .stat-value');
-        if (statCards.length >= 3) {
-          statCards[2].textContent = `${totalGlobalNeto.toFixed(2)}€`; // Total Neto
-          // Actualizar label con nuevo %
-          const netoLabel = stats.querySelectorAll('.stat-card .stat-label')[2];
-          if (netoLabel) netoLabel.textContent = `Total Neto (${irpfPorcentaje}% IRPF)`;
-        }
+      // Actualizar todos los valores neto sin recargar la página
+      // 1. Actualizar estadísticas globales
+      const totalGlobalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
+      const totalGlobalNeto = totalGlobalBruto * (1 - irpfPorcentaje / 100);
 
-        // 2. Actualizar todas las filas de jornales y totales de quincena
-        document.querySelectorAll('.quincena-card').forEach(card => {
-          // Actualizar todas las filas de la tabla
-          card.querySelectorAll('tbody tr').forEach(row => {
-            const brutoElement = row.querySelector('.bruto-value strong');
-            if (brutoElement) {
-              const bruto = parseFloat(brutoElement.textContent.replace('€', ''));
-              const neto = bruto * (1 - irpfPorcentaje / 100);
-              const netoElement = row.querySelector('.neto-value strong');
-              if (netoElement) {
-                netoElement.textContent = `${neto.toFixed(2)}€`;
-              }
-            }
-          });
+      const statCards = stats.querySelectorAll('.stat-card .stat-value');
+      if (statCards.length >= 3) {
+        statCards[2].textContent = `${totalGlobalNeto.toFixed(2)}€`; // Total Neto
+        // Actualizar label con nuevo %
+        const netoLabel = stats.querySelectorAll('.stat-card .stat-label')[2];
+        if (netoLabel) netoLabel.textContent = `Total Neto (${irpfPorcentaje}% IRPF)`;
+      }
 
-          // Actualizar totales de la quincena en el header
-          const brutoValueElement = card.querySelector('.quincena-total .bruto-value');
-          if (brutoValueElement) {
-            const totalBruto = parseFloat(brutoValueElement.textContent.replace('€', ''));
-            const totalNeto = totalBruto * (1 - irpfPorcentaje / 100);
-            const netoValueElement = card.querySelector('.quincena-total .neto-value');
-            if (netoValueElement) {
-              netoValueElement.textContent = `${totalNeto.toFixed(2)}€`;
+      // 2. Actualizar todas las filas de jornales y totales de quincena
+      document.querySelectorAll('.quincena-card').forEach(card => {
+        // Actualizar todas las filas de la tabla
+        card.querySelectorAll('tbody tr').forEach(row => {
+          const brutoElement = row.querySelector('.bruto-value strong');
+          if (brutoElement) {
+            const bruto = parseFloat(brutoElement.textContent.replace('€', ''));
+            const neto = bruto * (1 - irpfPorcentaje / 100);
+            const netoElement = row.querySelector('.neto-value strong');
+            if (netoElement) {
+              netoElement.textContent = `${neto.toFixed(2)}€`;
             }
           }
         });
+
+        // Actualizar totales de la quincena en el header
+        const brutoValueElement = card.querySelector('.quincena-total .bruto-value');
+        if (brutoValueElement) {
+          const totalBruto = parseFloat(brutoValueElement.textContent.replace('€', ''));
+          const totalNeto = totalBruto * (1 - irpfPorcentaje / 100);
+          const netoValueElement = card.querySelector('.quincena-total .neto-value');
+          if (netoValueElement) {
+            netoValueElement.textContent = `${totalNeto.toFixed(2)}€`;
+          }
+        }
       });
+    };
+
+    // Event listeners para cambios en IRPF
+    if (irpfInput) {
+      // Evento 'change' - cuando el usuario presiona Enter o cambia de campo
+      irpfInput.addEventListener('change', actualizarIRPF);
+
+      // Evento 'blur' - cuando el usuario sale del input (más robusto)
+      irpfInput.addEventListener('blur', actualizarIRPF);
     }
 
   } catch (error) {
