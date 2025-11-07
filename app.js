@@ -2404,13 +2404,21 @@ async function loadSueldometro() {
     // 1. Cargar datos necesarios
     console.log('📊 Cargando datos del Sueldómetro...');
 
-    const [jornales, mapeoPuestos, tablaSalarial] = await Promise.all([
+    const [jornalesSheets, mapeoPuestos, tablaSalarial] = await Promise.all([
       SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
       SheetsAPI.getMapeoPuestos(),
       SheetsAPI.getTablaSalarial()
     ]);
 
-    console.log(`✅ Datos cargados: ${jornales.length} jornales, ${mapeoPuestos.length} puestos, ${tablaSalarial.length} salarios`);
+    // 1.1 Cargar jornales manuales de localStorage
+    const jornalesManuales = JSON.parse(localStorage.getItem('jornales_historico') || '[]')
+      .filter(j => j.manual === true); // Solo los marcados como manuales
+
+    // 1.2 Mezclar jornales de Sheets con jornales manuales
+    const jornales = [...jornalesSheets, ...jornalesManuales];
+
+    console.log(`✅ Datos cargados: ${jornalesSheets.length} jornales de Sheets + ${jornalesManuales.length} manuales = ${jornales.length} total`);
+    console.log(`   ${mapeoPuestos.length} puestos, ${tablaSalarial.length} salarios`);
 
     if (jornales.length === 0) {
       content.innerHTML = `
@@ -2418,9 +2426,20 @@ async function loadSueldometro() {
           <div class="empty-icon">📊</div>
           <h3>No hay jornales registrados</h3>
           <p>Cuando trabajes tus primeros jornales aparecerán aquí con su estimación salarial</p>
+          <p style="margin-top: 1rem;">
+            <button id="add-jornal-btn-empty" class="btn-primary">➕ Añadir Jornal Manual</button>
+          </p>
         </div>
       `;
       loading.classList.add('hidden');
+
+      // Vincular botón de añadir jornal
+      const addBtnEmpty = document.getElementById('add-jornal-btn-empty');
+      if (addBtnEmpty) {
+        addBtnEmpty.addEventListener('click', () => {
+          document.getElementById('add-jornal-modal').style.display = 'flex';
+        });
+      }
       return;
     }
 
@@ -3466,6 +3485,7 @@ function initAddJornalManual() {
 
   const fechaInput = document.getElementById('jornal-fecha');
   const jornadaSelect = document.getElementById('jornal-jornada');
+  const tipoDiaSelect = document.getElementById('jornal-tipo-dia');
   const puestoSelect = document.getElementById('jornal-puesto');
   const puestoOtroGroup = document.getElementById('jornal-puesto-otro-group');
   const puestoOtroInput = document.getElementById('jornal-puesto-otro');
@@ -3484,6 +3504,7 @@ function initAddJornalManual() {
     // Limpiar formulario
     fechaInput.value = '';
     jornadaSelect.value = '';
+    tipoDiaSelect.value = '';
     puestoSelect.value = '';
     puestoOtroGroup.style.display = 'none';
     puestoOtroInput.value = '';
@@ -3524,7 +3545,7 @@ function initAddJornalManual() {
     successMsg.style.display = 'none';
 
     // Validar campos obligatorios
-    if (!fechaInput.value || !jornadaSelect.value || !puestoSelect.value || !empresaInput.value) {
+    if (!fechaInput.value || !jornadaSelect.value || !tipoDiaSelect.value || !puestoSelect.value || !empresaInput.value) {
       errorMsg.textContent = 'Por favor, completa todos los campos obligatorios (*)';
       errorMsg.style.display = 'block';
       return;
@@ -3549,6 +3570,7 @@ function initAddJornalManual() {
     const nuevoJornal = {
       fecha: fechaFormateada,
       jornada: jornadaSelect.value,
+      tipo_dia: tipoDiaSelect.value, // Necesario para cálculo de salario
       puesto: puestoFinal,
       empresa: empresaInput.value.trim(),
       buque: buqueInput.value.trim() || '--',
@@ -3601,6 +3623,11 @@ function initAddJornalManual() {
         // Recargar Mis Jornales si estamos en esa página
         if (document.getElementById('page-jornales').classList.contains('active')) {
           await loadJornales();
+        }
+
+        // Recargar Sueldómetro si estamos en esa página
+        if (document.getElementById('page-sueldometro').classList.contains('active')) {
+          await loadSueldometro();
         }
 
         cerrarModal();

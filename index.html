@@ -305,6 +305,9 @@
               <button id="irpf-lock-btn" class="lock-btn" title="Bloquear IRPF para que no cambie">🔓</button>
               <span class="irpf-help">Introduce tu porcentaje de retención y bloquéalo con 🔒</span>
             </label>
+            <button id="add-jornal-btn" class="btn-add-jornal" title="Añadir jornal manualmente">
+              ➕ Añadir Jornal Manual
+            </button>
           </div>
         </div>
         <div id="sueldometro-stats" class="stats-grid"></div>
@@ -471,7 +474,7 @@
       </div>
       <div class="modal-body">
         <p style="margin-bottom: 1rem; color: var(--puerto-dark-blue); font-size: 0.875rem;">
-          Introduce los datos de tu jornal. Este jornal se guardará localmente y se sincronizará con el Sueldómetro.
+          Introduce los datos de tu jornal. Este jornal se guardará <strong>solo en tu dispositivo</strong> (localStorage) y aparecerá en "Mis Jornales" y en el "Sueldómetro".
         </p>
         <div class="form-group">
           <label for="jornal-fecha">Fecha *</label>
@@ -485,6 +488,18 @@
             <option value="08 a 14">08 a 14</option>
             <option value="14 a 20">14 a 20</option>
             <option value="20 a 02">20 a 02</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="jornal-tipo-dia">Tipo de Día *</label>
+          <select id="jornal-tipo-dia" required>
+            <option value="">Selecciona tipo de día</option>
+            <option value="LABORABLE">Laborable</option>
+            <option value="SABADO">Sábado</option>
+            <option value="FESTIVO">Festivo</option>
+            <option value="FEST. A LAB.">Festivo a Laborable (20-02)</option>
+            <option value="LAB A FEST">Laborable a Festivo (20-02)</option>
+            <option value="FEST. A FEST.">Festivo a Festivo (20-02)</option>
           </select>
         </div>
         <div class="form-group">

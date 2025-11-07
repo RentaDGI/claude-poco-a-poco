@@ -1750,6 +1750,28 @@ body::before {
   font-style: italic;
 }
 
+.btn-add-jornal {
+  background: linear-gradient(135deg, var(--puerto-blue) 0%, var(--puerto-blue-dark) 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(10, 46, 92, 0.2);
+}
+
+.btn-add-jornal:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(10, 46, 92, 0.3);
+}
+
+.btn-add-jornal:active {
+  transform: translateY(0);
+}
+
 /* Botones de candado */
 .lock-btn {
   background: transparent;
