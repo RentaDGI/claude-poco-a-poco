@@ -24,6 +24,8 @@ const SHEETS_CONFIG = {
   GID_PUERTAS: '1650839211',       // Pestaña: Puertas (No se usa, getPuertas usa URL hardcodeada)
   GID_MAPEO_PUESTOS: '418043978',  // Pestaña: MAPEO_PUESTOS (Para Sueldómetro)
   GID_TABLA_SALARIOS: '1710373929', // Pestaña: TABLA_SALARIOS (Para Sueldómetro)
+  GID_CONFIGURACION_USUARIO: '988244680', // Pestaña: Configuracion_Usuario (IRPF)
+  GID_PRIMAS_PERSONALIZADAS: '1977235036', // Pestaña: Primas_Personalizadas
 
   // URL de la hoja "censo_limpio"
   URL_CENSO_LIMPIO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcJ5Irxl93zwDqehuLW7-MsuVtphRDtmF8Rwp-yueqcAYRfgrTtEdKDwX8WKkJj1m0rVJc8AncGN_A/pub?gid=1216182924&single=true&output=csv',
@@ -1289,23 +1291,42 @@ const SheetsAPI = {
   },
 
   /**
-   * Recupera la configuración del usuario (IRPF) desde localStorage
-   * NOTA: Se guarda en Sheets como backup pero se lee desde localStorage por CORS
+   * Recupera la configuración del usuario (IRPF) desde CSV público
+   * Lee directamente desde Configuracion_Usuario via CSV (sin CORS)
    */
   async getUserConfig(chapa) {
     try {
-      // Leer desde localStorage (fuente principal)
-      const irpf = localStorage.getItem(`irpf_${chapa}`);
+      // Leer desde CSV público
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_CONFIGURACION_USUARIO, false);
 
-      if (irpf !== null && irpf !== 'null') {
-        console.log('✅ IRPF recuperado de localStorage:', irpf);
-        return parseFloat(irpf);
+      // Buscar configuración del usuario
+      const config = data.find(row => {
+        const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
+        return rowChapa === chapa.toString().trim();
+      });
+
+      if (config) {
+        const irpf = parseFloat(config.IRPF_Porcentaje || config.irpf_porcentaje || 15);
+        console.log(`✅ IRPF recuperado de Sheets para chapa ${chapa}: ${irpf}%`);
+
+        // Guardar en localStorage como caché
+        localStorage.setItem(`irpf_${chapa}`, irpf.toString());
+
+        return irpf;
       } else {
-        console.log('ℹ️ IRPF no encontrado en localStorage, usando defecto');
+        console.log(`ℹ️ IRPF no encontrado en Sheets para chapa ${chapa}, usando defecto`);
         return 15; // Defecto
       }
     } catch (error) {
       console.error('❌ Error en getUserConfig:', error);
+
+      // Fallback a localStorage
+      const irpf = localStorage.getItem(`irpf_${chapa}`);
+      if (irpf !== null && irpf !== 'null') {
+        console.log('📂 IRPF recuperado de localStorage (fallback):', irpf);
+        return parseFloat(irpf);
+      }
+
       return 15; // Defecto
     }
   },
@@ -1342,21 +1363,48 @@ const SheetsAPI = {
   },
 
   /**
-   * Recupera todas las primas personalizadas del usuario desde localStorage
-   * NOTA: Se guarda en Sheets como backup pero se lee desde localStorage por CORS
+   * Recupera todas las primas personalizadas del usuario desde CSV público
+   * Lee directamente desde Primas_Personalizadas via CSV (sin CORS)
    */
   async getPrimasPersonalizadas(chapa) {
     try {
-      // Leer desde localStorage (fuente principal)
+      // Leer desde CSV público
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_PRIMAS_PERSONALIZADAS, false);
+
+      // Filtrar por chapa y mapear
+      const primas = data.filter(row => {
+        const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
+        return rowChapa === chapa.toString().trim();
+      }).map(row => ({
+        fecha: row.Fecha || row.fecha || '',
+        jornada: row.Jornada || row.jornada || '',
+        prima: parseFloat(row.Prima_Personalizada || row.prima_personalizada || 0),
+        movimientos: parseFloat(row.Movimientos_Personalizados || row.movimientos_personalizados || 0),
+        relevo: parseFloat(row.Relevo || row.relevo || 0),
+        remate: parseFloat(row.Remate || row.remate || 0)
+      }));
+
+      console.log(`✅ ${primas.length} primas recuperadas de Sheets para chapa ${chapa}`);
+
+      // Guardar en localStorage como caché
+      const primasObj = {};
+      primas.forEach(p => {
+        const key = `${p.fecha}_${p.jornada}`;
+        primasObj[key] = p;
+      });
+      localStorage.setItem('primas_personalizadas', JSON.stringify(primasObj));
+
+      return primas;
+    } catch (error) {
+      console.error('❌ Error en getPrimasPersonalizadas:', error);
+
+      // Fallback a localStorage
       const primas = localStorage.getItem('primas_personalizadas') || '{}';
       const primasObj = JSON.parse(primas);
       const primasArray = Object.values(primasObj);
 
-      console.log(`✅ ${primasArray.length} primas recuperadas de localStorage`);
+      console.log(`📂 ${primasArray.length} primas recuperadas de localStorage (fallback)`);
       return primasArray;
-    } catch (error) {
-      console.error('❌ Error en getPrimasPersonalizadas:', error);
-      return [];
     }
   },
 
