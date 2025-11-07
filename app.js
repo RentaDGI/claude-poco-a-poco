@@ -1916,8 +1916,8 @@ function renderForoMessages(messages) {
 
   container.innerHTML = '';
 
-  // Ordenar por timestamp (más RECIENTES primero, arriba)
-  const sorted = messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  // Ordenar por timestamp (más ANTIGUOS primero, recientes ABAJO como WhatsApp)
+  const sorted = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   // Obtener nombres de usuarios del cache
   const usuariosCache = JSON.parse(localStorage.getItem('usuarios_cache') || '{}');
@@ -1955,6 +1955,14 @@ function renderForoMessages(messages) {
     `;
 
     container.appendChild(messageDiv);
+  });
+
+  // Scroll automático al final para ver mensajes recientes (como WhatsApp)
+  // Usar requestAnimationFrame para asegurar que el DOM esté renderizado
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
   });
 }
 
