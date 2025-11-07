@@ -3036,8 +3036,8 @@ async function loadSueldometro() {
       });
     });
 
-    // Función para actualizar IRPF y persistir en localStorage
-    const actualizarIRPF = (e) => {
+    // Función para actualizar IRPF y persistir en localStorage y Sheets
+    const actualizarIRPF = async (e) => {
       const nuevoIRPF = parseFloat(e.target.value) || 0;
 
       // Validar rango (0-50%)
@@ -3050,6 +3050,12 @@ async function loadSueldometro() {
       // No hacer nada si el valor no cambió
       if (nuevoIRPF === irpfPorcentaje) {
         return;
+      }
+
+      // Guardar en Google Sheets
+      const guardadoEnSheets = await SheetsAPI.saveUserConfig(AppState.currentUser, nuevoIRPF);
+      if (guardadoEnSheets) {
+        console.log('✅ IRPF guardado en Sheets correctamente');
       }
 
       // Guardar en localStorage
