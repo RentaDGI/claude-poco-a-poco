@@ -324,18 +324,19 @@ function getPrimasPersonalizadas(params) {
 }
 
 // ============================================================================
-// 5. JORNALES MANUALES (Persistencia Permanente)
+// 5. JORNALES MANUALES - GUARDAR EN JORNALES_HISTORICO_ACUMULADO
 // ============================================================================
+/**
+ * Guarda jornal manual directamente en Jornales_Historico_Acumulado
+ * De esta forma se lee automáticamente via CSV público sin problemas de CORS
+ */
 function saveJornalManual(params) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_MANUALES);
+    const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_HISTORICO);
 
-    // Crear hoja si no existe
     if (!sheet) {
-      sheet = ss.insertSheet(CONFIG.HOJAS.JORNALES_MANUALES);
-      sheet.appendRow(['Chapa', 'Fecha', 'Jornada', 'Tipo_Dia', 'Puesto', 'Empresa', 'Buque', 'Parte', 'Fecha_Creacion']);
-      Logger.log('✅ Hoja Jornales_Manuales creada');
+      throw new Error('Hoja Jornales_Historico_Acumulado no encontrada');
     }
 
     const chapa = params.chapa;
@@ -346,25 +347,26 @@ function saveJornalManual(params) {
     const empresa = params.empresa;
     const buque = params.buque || '--';
     const parte = params.parte || '1';
-    const fechaCreacion = new Date();
 
     // Validar parámetros requeridos
-    if (!chapa || !fecha || !jornada || !tipo_dia || !puesto || !empresa) {
+    if (!chapa || !fecha || !jornada || !puesto || !empresa) {
       throw new Error('Faltan parámetros requeridos');
     }
 
     // Verificar si ya existe (evitar duplicados)
+    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] == chapa && data[i][1] == fecha && data[i][2] == jornada && data[i][4] == puesto) {
+      if (data[i][0] == fecha && data[i][1] == chapa && data[i][2] == puesto && data[i][3] == jornada) {
         Logger.log(`⚠️ Jornal duplicado detectado: ${chapa} ${fecha} ${jornada} ${puesto}`);
         return jsonResponse(false, null, 'Este jornal ya existe');
       }
     }
 
-    // Añadir nueva fila
-    sheet.appendRow([chapa, fecha, jornada, tipo_dia, puesto, empresa, buque, parte, fechaCreacion]);
-    Logger.log(`✅ Jornal manual guardado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+    // Añadir nueva fila DIRECTAMENTE a histórico
+    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
+    sheet.appendRow([fecha, chapa, puesto, jornada, empresa, buque, parte, 'MANUAL']);
+    Logger.log(`✅ Jornal manual guardado en histórico: ${chapa} ${fecha} ${jornada} ${puesto}`);
 
     return jsonResponse(true, null, 'Jornal guardado correctamente');
 
@@ -374,48 +376,13 @@ function saveJornalManual(params) {
   }
 }
 
+/**
+ * Ya no usamos esta función - los jornales manuales se leen desde CSV público
+ * La dejamos para compatibilidad pero devuelve vacío
+ */
 function getJornalesManuales(params) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_MANUALES);
-
-    if (!sheet) {
-      return jsonResponse(true, [], 'Hoja Jornales_Manuales no encontrada');
-    }
-
-    const chapa = params.chapa;
-
-    if (!chapa) {
-      throw new Error('Falta parámetro requerido: chapa');
-    }
-
-    const data = sheet.getDataRange().getValues();
-    const jornales = [];
-
-    // Recorrer todas las filas y recopilar jornales del usuario
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] == chapa) {
-        jornales.push({
-          chapa: data[i][0],
-          fecha: data[i][1],
-          jornada: data[i][2],
-          tipo_dia: data[i][3],
-          puesto: data[i][4],
-          empresa: data[i][5],
-          buque: data[i][6],
-          parte: data[i][7],
-          manual: true // Marcar como manual
-        });
-      }
-    }
-
-    Logger.log(`✅ Recuperados ${jornales.length} jornales manuales para chapa ${chapa}`);
-    return jsonResponse(true, jornales, `${jornales.length} jornales encontrados`);
-
-  } catch (error) {
-    Logger.log(`❌ getJornalesManuales: ${error.message}`);
-    return jsonResponse(false, null, error.message);
-  }
+  Logger.log('ℹ️ getJornalesManuales: Los jornales manuales ahora se leen desde Jornales_Historico_Acumulado via CSV');
+  return jsonResponse(true, [], 'Los jornales manuales se leen desde CSV público');
 }
 
 // ============================================================================

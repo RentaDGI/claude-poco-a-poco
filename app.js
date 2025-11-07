@@ -1177,25 +1177,22 @@ async function loadJornales() {
   try {
     let data = [];
 
-    // 1. INTENTAR CARGAR DESDE JORNALES_HISTORICO_ACUMULADO (se actualiza automáticamente cada hora)
-    console.log('📥 Cargando jornales desde Jornales_Historico_Acumulado...');
+    // 1. CARGAR DESDE JORNALES_HISTORICO_ACUMULADO
+    // (incluye automáticos + manuales, identificados por columna Origen='MANUAL')
+    console.log('📥 Cargando jornales desde Jornales_Historico_Acumulado (incluye manuales)...');
     try {
-      const [jornalesAcumulados, jornalesManualesSheets] = await Promise.all([
-        SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
-        SheetsAPI.getJornalesManuales(AppState.currentUser)
-      ]);
+      const jornalesAcumulados = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
 
       if (jornalesAcumulados && jornalesAcumulados.length > 0) {
-        console.log(`✅ Cargados ${jornalesAcumulados.length} jornales desde histórico acumulado`);
-        console.log(`✅ Cargados ${jornalesManualesSheets.length} jornales manuales desde Sheets`);
+        const manuales = jornalesAcumulados.filter(j => j.manual).length;
+        const automaticos = jornalesAcumulados.length - manuales;
+        console.log(`✅ ${jornalesAcumulados.length} jornales: ${automaticos} automáticos + ${manuales} manuales`);
 
-        // Mezclar jornales históricos con manuales
-        data = [...jornalesAcumulados, ...jornalesManualesSheets];
+        data = jornalesAcumulados;
 
-        // Guardar en localStorage como caché por si falla la conexión en el futuro
+        // Guardar en localStorage como caché
         const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
 
-        // Guardar históricos
         jornalesAcumulados.forEach(jornal => {
           const existe = historico.some(h =>
             h.fecha === jornal.fecha &&
@@ -1205,19 +1202,6 @@ async function loadJornales() {
           );
           if (!existe) {
             historico.push(jornal);
-          }
-        });
-
-        // Guardar manuales
-        jornalesManualesSheets.forEach(jornal => {
-          const existe = historico.some(h =>
-            h.fecha === jornal.fecha &&
-            h.jornada === jornal.jornada &&
-            h.puesto === jornal.puesto &&
-            h.manual === true
-          );
-          if (!existe) {
-            historico.push({ ...jornal, manual: true });
           }
         });
 
@@ -2426,34 +2410,15 @@ async function loadSueldometro() {
     // 1. Cargar datos necesarios
     console.log('📊 Cargando datos del Sueldómetro...');
 
-    const [jornalesSheets, jornalesManualesSheets, mapeoPuestos, tablaSalarial] = await Promise.all([
-      SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
-      SheetsAPI.getJornalesManuales(AppState.currentUser),
+    const [jornales, mapeoPuestos, tablaSalarial] = await Promise.all([
+      SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser), // Ya incluye manuales
       SheetsAPI.getMapeoPuestos(),
       SheetsAPI.getTablaSalarial()
     ]);
 
-    // 1.1 Cargar jornales manuales de localStorage como fallback
-    const jornalesManualesLocal = JSON.parse(localStorage.getItem('jornales_historico') || '[]')
-      .filter(j => j.manual === true && j.chapa === AppState.currentUser);
-
-    // 1.2 Mezclar jornales de Sheets (histórico + manuales) + manuales locales
-    // Evitar duplicados comparando fecha+jornada+puesto
-    const jornalesManualesMerged = [...jornalesManualesSheets];
-    jornalesManualesLocal.forEach(jLocal => {
-      const existe = jornalesManualesSheets.some(jSheet =>
-        jSheet.fecha === jLocal.fecha &&
-        jSheet.jornada === jLocal.jornada &&
-        jSheet.puesto === jLocal.puesto
-      );
-      if (!existe) {
-        jornalesManualesMerged.push(jLocal);
-      }
-    });
-
-    const jornales = [...jornalesSheets, ...jornalesManualesMerged];
-
-    console.log(`✅ Datos cargados: ${jornalesSheets.length} histórico + ${jornalesManualesSheets.length} manuales (Sheets) + ${jornalesManualesLocal.length - jornalesManualesSheets.length} manuales (local) = ${jornales.length} total`);
+    const manuales = jornales.filter(j => j.manual).length;
+    const automaticos = jornales.length - manuales;
+    console.log(`✅ ${jornales.length} jornales: ${automaticos} automáticos + ${manuales} manuales`);
     console.log(`   ${mapeoPuestos.length} puestos, ${tablaSalarial.length} salarios`);
 
     if (jornales.length === 0) {

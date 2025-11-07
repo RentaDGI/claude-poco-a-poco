@@ -1090,7 +1090,8 @@ const SheetsAPI = {
   /**
    * [ROBUSTO] Obtiene jornales desde el histórico acumulado (Jornales_Historico_Acumulado)
    * Esta pestaña se alimenta automáticamente cada hora desde contrata_glide vía Apps Script
-   * Columnas: Fecha, Chapa, Puesto_Contratacion, Jornada, Empresa, Buque, Parte, Logo_Empresa_URL, Timestamp_Guardado
+   * AHORA TAMBIÉN INCLUYE JORNALES MANUALES (con columna Origen = "MANUAL")
+   * Columnas: Fecha, Chapa, Puesto_Contratacion, Jornada, Empresa, Buque, Parte, Origen
    */
   async getJornalesHistoricoAcumulado(chapa) {
     try {
@@ -1101,19 +1102,25 @@ const SheetsAPI = {
       const jornalesChapa = data.filter(row => {
         const rowChapa = (row.Chapa || row.chapa || '').toString().trim();
         return rowChapa === chapa.toString().trim();
-      }).map(row => ({
-        chapa: row.Chapa || row.chapa || '',
-        fecha: row.Fecha || row.fecha || '',
-        puesto: row.Puesto_Contratacion || row.puesto_contratacion || row.Puesto || row.puesto || '',
-        jornada: row.Jornada || row.jornada || '',
-        empresa: row.Empresa || row.empresa || '',
-        buque: row.Buque || row.buque || '',
-        parte: row.Parte || row.parte || '',
-        logo_empresa_url: row.Logo_Empresa_URL || row.logo_empresa_url || '',
-        timestamp_guardado: row.Timestamp_Guardado || row.timestamp_guardado || ''
-      })).filter(item => item.fecha && item.jornada); // Filtrar filas sin fecha o jornada
+      }).map(row => {
+        const origen = (row.Origen || row.origen || '').toString().trim();
+        const esManual = origen === 'MANUAL';
 
-      console.log(`✅ Jornales históricos acumulados para chapa ${chapa}:`, jornalesChapa.length);
+        return {
+          chapa: row.Chapa || row.chapa || '',
+          fecha: row.Fecha || row.fecha || '',
+          puesto: row.Puesto_Contratacion || row.puesto_contratacion || row.Puesto || row.puesto || '',
+          jornada: row.Jornada || row.jornada || '',
+          empresa: row.Empresa || row.empresa || '',
+          buque: row.Buque || row.buque || '',
+          parte: row.Parte || row.parte || '',
+          manual: esManual, // Marcar si es manual
+          origen: origen
+        };
+      }).filter(item => item.fecha && item.jornada); // Filtrar filas sin fecha o jornada
+
+      const manuales = jornalesChapa.filter(j => j.manual).length;
+      console.log(`✅ Jornales históricos acumulados para chapa ${chapa}: ${jornalesChapa.length} (${manuales} manuales)`);
       return jornalesChapa;
 
     } catch (error) {
