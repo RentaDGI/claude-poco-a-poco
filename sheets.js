@@ -30,7 +30,10 @@ const SHEETS_CONFIG = {
 
   // URLs del Sueldómetro (Añadidas para que las funciones las usen)
   URL_MAPEO_PUESTOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=418043978',
-  URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929'
+  URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929',
+
+  // URL del Apps Script (Web App deployada)
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUJBYaKF970Zvg2dVzCYnqUgHg8kdexhTBe8AmR8aPWThospFT614quLN5cJ3BP_7h2w/exec'
 };
 
 /**
@@ -1251,6 +1254,123 @@ const SheetsAPI = {
     ];
 
     return quincenas.map(q => ({ ...q, chapa }));
+  },
+
+  /**
+   * Guarda la configuración del usuario (IRPF) en Google Sheets
+   */
+  async saveUserConfig(chapa, irpf) {
+    try {
+      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'saveUserConfig',
+          chapa: chapa,
+          irpf: irpf
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('✅ IRPF guardado en Sheets:', result);
+        return true;
+      } else {
+        console.error('❌ Error guardando IRPF:', result.message);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error en saveUserConfig:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Recupera la configuración del usuario (IRPF) desde Google Sheets
+   */
+  async getUserConfig(chapa) {
+    try {
+      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'getUserConfig',
+          chapa: chapa
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('✅ IRPF recuperado de Sheets:', result.data);
+        return result.data.irpf;
+      } else {
+        console.log('ℹ️ IRPF no encontrado, usando defecto');
+        return 15; // Defecto
+      }
+    } catch (error) {
+      console.error('❌ Error en getUserConfig:', error);
+      return 15; // Defecto
+    }
+  },
+
+  /**
+   * Guarda una prima personalizada en Google Sheets
+   */
+  async savePrimaPersonalizada(chapa, fecha, jornada, prima, movimientos = null) {
+    try {
+      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'savePrimaPersonalizada',
+          chapa: chapa,
+          fecha: fecha,
+          jornada: jornada,
+          prima: prima,
+          movimientos: movimientos
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('✅ Prima guardada en Sheets:', result);
+        return true;
+      } else {
+        console.error('❌ Error guardando prima:', result.message);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error en savePrimaPersonalizada:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Recupera todas las primas personalizadas del usuario desde Google Sheets
+   */
+  async getPrimasPersonalizadas(chapa) {
+    try {
+      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'getPrimasPersonalizadas',
+          chapa: chapa
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log(`✅ ${result.data.length} primas recuperadas de Sheets`);
+        return result.data;
+      } else {
+        console.log('ℹ️ No hay primas personalizadas');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error en getPrimasPersonalizadas:', error);
+      return [];
+    }
   }
 };
 
