@@ -853,7 +853,7 @@ async function loadContratacion() {
     };
 
     // 3. FILTRAR CONTRATACIONES VÁLIDAS (según horario de medianoche)
-    const data = allCachedData.filter(item => {
+    let data = allCachedData.filter(item => {
       const jornadaNorm = normalizeJornada(item.jornada);
 
       // Jornada 02-08 con fecha de mañana: mostrar hasta medianoche de mañana
@@ -868,6 +868,68 @@ async function loadContratacion() {
 
       return false;
     });
+
+    console.log(`📊 localStorage: ${data.length} contrataciones válidas para hoy`);
+
+    // 3.1 FALLBACK: Si no hay datos en localStorage, buscar en Jornales_Historico_Acumulado
+    if (data.length === 0) {
+      console.log('🔍 No hay datos en localStorage, buscando en Sheets (Jornales_Historico_Acumulado)...');
+      try {
+        const jornalesHistorico = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
+        console.log(`📥 Sheets: ${jornalesHistorico.length} jornales obtenidos del histórico`);
+
+        // Filtrar solo jornales de HOY
+        const jornalesHoy = jornalesHistorico.filter(jornal => {
+          if (jornal.fecha === fechaHoy) {
+            return true;
+          }
+          // También incluir 02-08 de mañana
+          const jornadaNorm = normalizeJornada(jornal.jornada);
+          if (jornadaNorm === '02-08' && jornal.fecha === fechaManana) {
+            return true;
+          }
+          return false;
+        });
+
+        if (jornalesHoy.length > 0) {
+          console.log(`✅ Sheets: ${jornalesHoy.length} jornales de hoy encontrados`);
+
+          // Convertir formato de Sheets a formato de contratación
+          data = jornalesHoy.map(jornal => ({
+            chapa: jornal.chapa,
+            fecha: jornal.fecha,
+            jornada: jornal.jornada,
+            puesto: jornal.puesto,
+            empresa: jornal.empresa || '',
+            buque: jornal.buque || '',
+            parte: jornal.parte || '',
+            logo_url: jornal.logo_url || '',
+            timestamp_guardado: new Date().toISOString()
+          }));
+
+          // Guardar en localStorage para próximas cargas
+          if (!cacheContrataciones[userKey]) {
+            cacheContrataciones[userKey] = [];
+          }
+          data.forEach(nueva => {
+            const existe = cacheContrataciones[userKey].some(c =>
+              c.fecha === nueva.fecha &&
+              c.jornada === nueva.jornada &&
+              c.puesto === nueva.puesto
+            );
+            if (!existe) {
+              cacheContrataciones[userKey].push(nueva);
+            }
+          });
+          localStorage.setItem('contrataciones_cache', JSON.stringify(cacheContrataciones));
+          console.log('💾 Datos de Sheets guardados en localStorage');
+        } else {
+          console.log('ℹ️ No hay jornales de hoy en Sheets');
+        }
+      } catch (error) {
+        console.error('❌ Error al buscar en Sheets:', error);
+      }
+    }
 
     console.log(`📊 Mostrando: ${data.length} contrataciones válidas`);
 
