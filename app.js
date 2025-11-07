@@ -1019,8 +1019,8 @@ async function loadContratacion() {
 
         card.innerHTML = `
           ${logo ? `
-            <div style="background: white; padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 120px; border-bottom: 2px solid var(--border-color);">
-              <img src="${logo}" alt="${row.empresa}" style="max-width: 100%; max-height: 100px; object-fit: contain;">
+            <div style="background: white; padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 140px; border-bottom: 2px solid var(--border-color);">
+              <img src="${logo}" alt="${row.empresa}" style="max-width: 100%; max-height: 150px; object-fit: contain;">
             </div>
           ` : `
             <div style="background: linear-gradient(135deg, var(--puerto-blue), var(--puerto-dark-blue)); padding: 2rem; text-align: center;">
