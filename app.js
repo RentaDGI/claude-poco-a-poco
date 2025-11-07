@@ -3586,7 +3586,7 @@ function initAddJornalManual() {
       jornada: jornadaSelect.value,
       tipo_dia: tipoDiaSelect.value, // Necesario para cálculo de salario
       puesto: puestoFinal,
-      empresa: empresaInput.value.trim(),
+      empresa: empresaInput.value, // Select, no necesita trim
       buque: buqueInput.value.trim() || '--',
       parte: parteInput.value || '1',
       manual: true // Marcar como añadido manualmente

@@ -274,7 +274,12 @@
         </div>
       </div>
       <div class="container">
-        <div id="jornales-stats" class="stats-grid"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <div id="jornales-stats" class="stats-grid" style="flex: 1;"></div>
+          <button id="add-jornal-btn" class="btn-add-jornal" title="Añadir jornal manualmente">
+            ➕ Añadir Jornal Manual
+          </button>
+        </div>
         <div id="jornales-loading" class="loading-state">
           <div class="spinner"></div>
           <p>Cargando jornales...</p>
@@ -305,9 +310,6 @@
               <button id="irpf-lock-btn" class="lock-btn" title="Bloquear IRPF para que no cambie">🔓</button>
               <span class="irpf-help">Introduce tu porcentaje de retención y bloquéalo con 🔒</span>
             </label>
-            <button id="add-jornal-btn" class="btn-add-jornal" title="Añadir jornal manualmente">
-              ➕ Añadir Jornal Manual
-            </button>
           </div>
         </div>
         <div id="sueldometro-stats" class="stats-grid"></div>
@@ -521,7 +523,15 @@
         </div>
         <div class="form-group">
           <label for="jornal-empresa">Empresa *</label>
-          <input type="text" id="jornal-empresa" placeholder="Ej: MSC, APM, CSP..." required>
+          <select id="jornal-empresa" required>
+            <option value="">Selecciona una empresa</option>
+            <option value="MSC">MSC</option>
+            <option value="CSP">CSP</option>
+            <option value="APM">APM</option>
+            <option value="ERH">ERH</option>
+            <option value="TRASMED">TRASMED</option>
+            <option value="VTEU">VTEU</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="jornal-buque">Buque</label>
