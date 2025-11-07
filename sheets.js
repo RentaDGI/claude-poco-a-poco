@@ -33,7 +33,7 @@ const SHEETS_CONFIG = {
   URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929',
 
   // URL del Apps Script (Web App deployada) - ACTUALIZADA
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyEinulVF1E8uVfF6-3lecnmgasVZNi_LSc5tw1dJCIlzJQGoyVj2v8SDIoBudC67A08A/exec'
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwnTuScMFiAvEIgFmuRPTXm64slCMsVPvPOAPrh191TBQZhJuaWF6tKsCPa3WX4ZFlKIg/exec'
 };
 
 /**
@@ -1443,6 +1443,7 @@ function clearSheetsCache() {
 // Exponer API globalmente
 window.SheetsAPI = SheetsAPI;
 window.clearSheetsCache = clearSheetsCache;
+
 
 
 
