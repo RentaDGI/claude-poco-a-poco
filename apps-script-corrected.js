@@ -17,10 +17,30 @@ const CONFIG = {
 };
 
 /**
+ * Endpoint GET para verificar que el servicio está funcionando
+ */
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: true,
+      message: 'Apps Script funcionando correctamente',
+      timestamp: new Date().toISOString()
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
  * Endpoint principal para recibir peticiones POST
  */
 function doPost(e) {
   try {
+    // Validar que hay datos
+    if (!e.postData || !e.postData.contents) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, error: 'No se recibieron datos' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const params = JSON.parse(e.postData.contents);
     const action = params.action;
 
@@ -50,7 +70,7 @@ function doPost(e) {
   } catch (error) {
     Logger.log(`❌ Error en doPost: ${error.message}`);
     return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: error.message }))
+      .createTextOutput(JSON.stringify({ success: false, error: error.message, stack: error.stack }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }

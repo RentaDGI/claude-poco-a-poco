@@ -670,10 +670,29 @@
       e.preventDefault();
       deferredPrompt = e;
 
-      // Mostrar botón de instalación personalizado
+      // Mostrar botón de instalación solo en la página de login
       console.log('💡 La app puede ser instalada - mostrando botón');
       if (installBtn) {
-        installBtn.classList.add('visible');
+        // Función para verificar si estamos en login
+        const checkAndShowButton = () => {
+          const currentPage = document.querySelector('.page.active')?.id;
+          if (currentPage === 'login') {
+            installBtn.classList.add('visible');
+          } else {
+            installBtn.classList.remove('visible');
+          }
+        };
+
+        // Verificar inmediatamente
+        checkAndShowButton();
+
+        // Verificar cada vez que cambie la página
+        const observer = new MutationObserver(checkAndShowButton);
+        observer.observe(document.getElementById('app'), {
+          attributes: true,
+          subtree: true,
+          attributeFilter: ['class']
+        });
       }
     });
 

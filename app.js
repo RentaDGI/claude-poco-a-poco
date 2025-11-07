@@ -1956,6 +1956,11 @@ function renderForoMessages(messages) {
 
     container.appendChild(messageDiv);
   });
+
+  // Auto-scroll al final para mostrar mensajes más recientes
+  setTimeout(() => {
+    container.scrollTop = container.scrollHeight;
+  }, 100);
 }
 
 /**
