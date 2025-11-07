@@ -2435,7 +2435,7 @@ async function loadSueldometro() {
 
     // 1.1 Cargar jornales manuales de localStorage como fallback
     const jornalesManualesLocal = JSON.parse(localStorage.getItem('jornales_historico') || '[]')
-      .filter(j => j.manual === true);
+      .filter(j => j.manual === true && j.chapa === AppState.currentUser);
 
     // 1.2 Mezclar jornales de Sheets (histórico + manuales) + manuales locales
     // Evitar duplicados comparando fecha+jornada+puesto
@@ -3604,6 +3604,7 @@ function initAddJornalManual() {
 
     // Crear objeto jornal
     const nuevoJornal = {
+      chapa: AppState.currentUser,
       fecha: fechaFormateada,
       jornada: jornadaSelect.value,
       tipo_dia: tipoDiaSelect.value, // Necesario para cálculo de salario

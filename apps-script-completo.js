@@ -396,6 +396,7 @@ function getJornalesManuales(params) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] == chapa) {
         jornales.push({
+          chapa: data[i][0],
           fecha: data[i][1],
           jornada: data[i][2],
           tipo_dia: data[i][3],
