@@ -2531,19 +2531,19 @@ async function loadSueldometro() {
     stats.innerHTML = `
       <div class="stat-card">
         <div class="stat-value">${totalJornales}</div>
-        <div class="stat-label">Jornales Totales</div>
+        <div class="stat-label">Jornales Totales (Anual)</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${salarioTotalBruto.toFixed(2)}€</div>
-        <div class="stat-label">Total Bruto</div>
+        <div class="stat-value" style="color: var(--puerto-orange);">${salarioTotalBruto.toFixed(2)}€</div>
+        <div class="stat-label">Total Bruto (Anual)</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${salarioTotalNeto.toFixed(2)}€</div>
-        <div class="stat-label">Total Neto (${irpfPorcentaje}% IRPF)</div>
+        <div class="stat-value" style="color: var(--puerto-green);">${salarioTotalNeto.toFixed(2)}€</div>
+        <div class="stat-label">Total Neto (Anual - ${irpfPorcentaje}% IRPF)</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${salarioPromedioBruto.toFixed(2)}€</div>
-        <div class="stat-label">Promedio Bruto</div>
+        <div class="stat-value" style="color: var(--puerto-orange);">${salarioPromedioBruto.toFixed(2)}€</div>
+        <div class="stat-label">Promedio Bruto (Anual)</div>
       </div>
     `;
 
@@ -2742,20 +2742,19 @@ async function loadSueldometro() {
                   </td>
                   <td>
                     ${tarifaRelevo !== null ? `
-                      <div style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem;">
-                        <input
-                          type="number"
-                          class="relevo-input"
-                          value="${horasRelevoValue}"
-                          min="0"
-                          max="24"
-                          step="1"
-                          data-jornal-index="${idx}"
-                          style="width: 50px;"
-                        />
-                        <span class="text-muted">× ${tarifaRelevo.toFixed(2)}€</span>
+                      <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                        <label style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                          <input
+                            type="checkbox"
+                            class="relevo-checkbox"
+                            ${horasRelevoValue > 0 ? 'checked' : ''}
+                            data-jornal-index="${idx}"
+                            style="width: 20px; height: 20px; cursor: pointer; margin-right: 6px;"
+                          />
+                          <span style="white-space: nowrap;">1h (${tarifaRelevo.toFixed(2)}€)</span>
+                        </label>
                       </div>
-                      <div style="font-size: 0.75rem; color: #666;">= ${importeRelevo.toFixed(2)}€</div>
+                      <div style="font-size: 0.75rem; color: #666; font-weight: 600;">= ${importeRelevo.toFixed(2)}€</div>
                     ` : `
                       <span class="text-muted">N/A</span>
                     `}
@@ -2905,10 +2904,10 @@ async function loadSueldometro() {
         });
       });
 
-      // Event listener para inputs de horas de relevo
-      card.querySelectorAll('.relevo-input').forEach(input => {
-        input.addEventListener('input', (e) => {
-          const horasRelevo = parseFloat(e.target.value) || 0;
+      // Event listener para checkboxes de horas de relevo
+      card.querySelectorAll('.relevo-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+          const horasRelevo = e.target.checked ? 1 : 0;
           const jornalIndex = parseInt(e.target.dataset.jornalIndex);
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
@@ -3465,7 +3464,6 @@ function initForoEnhanced() {
   const sendBtn = document.getElementById('foro-send');
   const foroInput = document.getElementById('foro-input');
   const charCount = document.getElementById('foro-char-count');
-  const searchInput = document.getElementById('foro-search');
   const refreshBtn = document.getElementById('foro-refresh');
 
   if (!sendBtn || !foroInput) return;
@@ -3501,25 +3499,6 @@ function initForoEnhanced() {
       }
     }
   });
-
-  // Búsqueda de mensajes
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      const messages = document.querySelectorAll('.foro-message');
-
-      messages.forEach(msg => {
-        const text = msg.querySelector('.foro-message-text')?.textContent.toLowerCase() || '';
-        const chapa = msg.querySelector('.foro-message-chapa')?.textContent.toLowerCase() || '';
-
-        if (text.includes(query) || chapa.includes(query) || query === '') {
-          msg.style.display = '';
-        } else {
-          msg.style.display = 'none';
-        }
-      });
-    });
-  }
 
   // Botón de refresh
   if (refreshBtn) {
