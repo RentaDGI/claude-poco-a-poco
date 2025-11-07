@@ -532,8 +532,60 @@ const SheetsAPI = {
   // ... (el resto del archivo sheets.js se mantiene igual)
 
   /**
+   * NUEVA FUNCIÓN: Determina la última jornada contratada desde CSV
+   *
+   * CAMBIO FUNDAMENTAL: Se basa en los DATOS del CSV de puertas, NO en la hora del sistema.
+   *
+   * Funcionamiento:
+   * 1. Lee todas las puertas del CSV
+   * 2. Recorre el ciclo de jornadas en orden de contratación (02-08, 08-14, 14-20, 20-02)
+   * 3. La última jornada que tenga datos es la última contratada
+   * 4. Devuelve la puerta desde donde empezará la siguiente contratación
+   *
+   * Ejemplo:
+   * - Si en el CSV: 02-08 tiene puerta 100, 08-14 tiene puerta 400, 14-20 vacío, 20-02 vacío
+   * - Última contratada: 08-14
+   * - Retorna: puerta 400 (la última puerta contratada)
+   *
+   * @param {Array} puertas - Array de puertas del CSV
+   * @param {boolean} esSP - true si es censo SP, false si es OC
+   * @returns {number|null} La puerta de la última jornada contratada, o null si no hay datos
+   */
+  detectarUltimaJornadaContratada(puertas, esSP) {
+    // Orden de contratación de jornadas
+    const ordenJornadas = ['02-08', '08-14', '14-20', '20-02'];
+
+    let ultimaPuerta = null;
+    let ultimaJornada = null;
+
+    // Recorrer en orden de contratación
+    for (const jornada of ordenJornadas) {
+      const puertaData = puertas.find(p => p.jornada === jornada);
+
+      if (puertaData) {
+        const puertaValue = esSP ? puertaData.puertaSP : puertaData.puertaOC;
+        const puertaNum = parseInt(puertaValue);
+
+        // Si esta jornada tiene datos (puerta válida), es una jornada contratada
+        if (puertaValue && puertaValue.trim() !== '' && !isNaN(puertaNum) && puertaNum > 0) {
+          ultimaPuerta = puertaNum;
+          ultimaJornada = jornada;
+        }
+      }
+    }
+
+    if (ultimaJornada) {
+      console.log(`✅ Última jornada contratada (${esSP ? 'SP' : 'OC'}): ${ultimaJornada} - Puerta: ${ultimaPuerta}`);
+    } else {
+      console.log(`⚠️ No se encontraron jornadas contratadas (${esSP ? 'SP' : 'OC'})`);
+    }
+
+    return ultimaPuerta;
+  },
+
+  /**
    * Calcula posiciones hasta contratación (Laborable y Festiva)
-   * (Actualizado para usar el nuevo getPosicionChapa y el nuevo getPuertas)
+   * ACTUALIZADO: Ahora detecta la última jornada contratada desde el CSV
    * Devuelve un objeto: { laborable: X, festiva: Y }
    */
   async getPosicionesHastaContratacion(chapa) {
@@ -555,67 +607,58 @@ const SheetsAPI = {
       const puertas = puertasResult.puertas;
 
       // --- 3. CÁLCULO PARA PUERTAS LABORABLES ---
+      // Filtrar solo puertas laborables (excluir Festivo)
       const puertasLaborables = puertas.filter(p => p.jornada !== 'Festivo');
-      
-      const puertasSP_Lab = puertasLaborables
-        .map(p => parseInt(p.puertaSP))
-        .filter(n => !isNaN(n) && n > 0);
-      
-      const puertasOC_Lab = puertasLaborables
-        .map(p => parseInt(p.puertaOC))
-        .filter(n => !isNaN(n) && n > 0);
 
       let posicionesLaborable = null;
 
-      if (esUsuarioSP) {
-        if (puertasSP_Lab.length > 0) {
-          const ultimaPuertaSP_Lab = Math.max(...puertasSP_Lab);
-          if (posicionUsuario > ultimaPuertaSP_Lab) {
-            posicionesLaborable = posicionUsuario - ultimaPuertaSP_Lab;
+      // NUEVA LÓGICA: Detectar última jornada contratada desde CSV
+      const ultimaPuertaLaborable = this.detectarUltimaJornadaContratada(puertasLaborables, esUsuarioSP);
+
+      if (ultimaPuertaLaborable !== null) {
+        if (esUsuarioSP) {
+          // Usuario SP
+          if (posicionUsuario > ultimaPuertaLaborable) {
+            posicionesLaborable = posicionUsuario - ultimaPuertaLaborable;
           } else {
-            posicionesLaborable = (LIMITE_SP - ultimaPuertaSP_Lab) + posicionUsuario;
+            posicionesLaborable = (LIMITE_SP - ultimaPuertaLaborable) + posicionUsuario;
           }
-        }
-      } else { // esUsuarioOC
-        if (puertasOC_Lab.length > 0) {
-          const ultimaPuertaOC_Lab = Math.max(...puertasOC_Lab);
-          if (posicionUsuario > ultimaPuertaOC_Lab) {
-            posicionesLaborable = posicionUsuario - ultimaPuertaOC_Lab;
+        } else {
+          // Usuario OC
+          if (posicionUsuario > ultimaPuertaLaborable) {
+            posicionesLaborable = posicionUsuario - ultimaPuertaLaborable;
           } else {
-            posicionesLaborable = (FIN_OC - ultimaPuertaOC_Lab) + (posicionUsuario - INICIO_OC + 1);
+            posicionesLaborable = (FIN_OC - ultimaPuertaLaborable) + (posicionUsuario - INICIO_OC + 1);
           }
         }
       }
 
       // --- 4. CÁLCULO PARA PUERTAS FESTIVAS ---
       const puertasFestivas = puertas.filter(p => p.jornada === 'Festivo');
-      
-      const puertasSP_Fest = puertasFestivas
-        .map(p => parseInt(p.puertaSP))
-        .filter(n => !isNaN(n) && n > 0);
 
-      const puertasOC_Fest = puertasFestivas
-        .map(p => parseInt(p.puertaOC))
-        .filter(n => !isNaN(n) && n > 0);
-      
       let posicionesFestiva = null;
 
-      if (esUsuarioSP) {
-        if (puertasSP_Fest.length > 0) {
-          const ultimaPuertaSP_Fest = Math.max(...puertasSP_Fest);
-          if (posicionUsuario > ultimaPuertaSP_Fest) {
-            posicionesFestiva = posicionUsuario - ultimaPuertaSP_Fest;
+      if (puertasFestivas.length > 0) {
+        // Para festivos, seguimos usando la lógica de máximo ya que solo hay una jornada festiva
+        const puertasFest = puertasFestivas
+          .map(p => parseInt(esUsuarioSP ? p.puertaSP : p.puertaOC))
+          .filter(n => !isNaN(n) && n > 0);
+
+        if (puertasFest.length > 0) {
+          const ultimaPuertaFest = Math.max(...puertasFest);
+
+          if (esUsuarioSP) {
+            if (posicionUsuario > ultimaPuertaFest) {
+              posicionesFestiva = posicionUsuario - ultimaPuertaFest;
+            } else {
+              posicionesFestiva = (LIMITE_SP - ultimaPuertaFest) + posicionUsuario;
+            }
           } else {
-            posicionesFestiva = (LIMITE_SP - ultimaPuertaSP_Fest) + posicionUsuario;
-          }
-        }
-      } else { // esUsuarioOC
-        if (puertasOC_Fest.length > 0) {
-          const ultimaPuertaOC_Fest = Math.max(...puertasOC_Fest);
-          if (posicionUsuario > ultimaPuertaOC_Fest) {
-            posicionesFestiva = posicionUsuario - ultimaPuertaOC_Fest;
-          } else {
-            posicionesFestiva = (FIN_OC - ultimaPuertaOC_Fest) + (posicionUsuario - INICIO_OC + 1);
+            if (posicionUsuario > ultimaPuertaFest) {
+              posicionesFestiva = posicionUsuario - ultimaPuertaFest;
+            } else {
+              posicionesFestiva = (FIN_OC - ultimaPuertaFest) + (posicionUsuario - INICIO_OC + 1);
+            }
           }
         }
       }
@@ -1473,7 +1516,6 @@ function clearSheetsCache() {
 // Exponer API globalmente
 window.SheetsAPI = SheetsAPI;
 window.clearSheetsCache = clearSheetsCache;
-
 
 
 
