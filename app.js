@@ -2725,16 +2725,49 @@ async function loadSueldometro() {
       return tarifasRemate[jornada]?.[tipoDia] || null;
     };
 
-    // Cargar valores bloqueados de localStorage
+    // Cargar valores bloqueados desde Sheets primero, luego localStorage como fallback
     const lockedValuesKey = `locked_values_${AppState.currentUser}`;
     let lockedValues = {};
+
+    // 1. Intentar cargar desde Sheets
     try {
-      const stored = localStorage.getItem(lockedValuesKey);
-      if (stored) {
-        lockedValues = JSON.parse(stored);
+      console.log('📥 Cargando primas personalizadas desde Sheets...');
+      const primasSheets = await SheetsAPI.getPrimasPersonalizadas(AppState.currentUser);
+
+      if (primasSheets && primasSheets.length > 0) {
+        // Poblar lockedValues con datos de Sheets
+        primasSheets.forEach(p => {
+          const key = `${p.fecha}_${p.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '')}`;
+          lockedValues[key] = {
+            prima: p.prima || 0,
+            movimientos: p.movimientos || 0,
+            horasRelevo: p.relevo || 0,
+            horasRemate: p.remate || 0,
+            primaLocked: true,
+            movimientosLocked: true
+          };
+        });
+
+        console.log(`✅ ${primasSheets.length} primas personalizadas cargadas desde Sheets`);
+
+        // Guardar en localStorage como caché
+        localStorage.setItem(lockedValuesKey, JSON.stringify(lockedValues));
       }
-    } catch (e) {
-      console.warn('Error cargando valores bloqueados:', e);
+    } catch (error) {
+      console.warn('⚠️ Error cargando primas desde Sheets, usando localStorage:', error);
+    }
+
+    // 2. Si no hay datos de Sheets, cargar desde localStorage
+    if (Object.keys(lockedValues).length === 0) {
+      try {
+        const stored = localStorage.getItem(lockedValuesKey);
+        if (stored) {
+          lockedValues = JSON.parse(stored);
+          console.log(`📂 Valores bloqueados cargados desde localStorage`);
+        }
+      } catch (e) {
+        console.warn('Error cargando valores bloqueados de localStorage:', e);
+      }
     }
 
     // Función para guardar valores bloqueados
