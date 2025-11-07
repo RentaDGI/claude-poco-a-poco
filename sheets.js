@@ -1282,25 +1282,19 @@ const SheetsAPI = {
   },
 
   /**
-   * Recupera la configuración del usuario (IRPF) desde Google Sheets
+   * Recupera la configuración del usuario (IRPF) desde localStorage
+   * NOTA: Se guarda en Sheets como backup pero se lee desde localStorage por CORS
    */
   async getUserConfig(chapa) {
     try {
-      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'getUserConfig',
-          chapa: chapa
-        })
-      });
+      // Leer desde localStorage (fuente principal)
+      const irpf = localStorage.getItem(`irpf_${chapa}`);
 
-      const result = await response.json();
-      if (result.success) {
-        console.log('✅ IRPF recuperado de Sheets:', result.data);
-        return result.data.irpf;
+      if (irpf !== null && irpf !== 'null') {
+        console.log('✅ IRPF recuperado de localStorage:', irpf);
+        return parseFloat(irpf);
       } else {
-        console.log('ℹ️ IRPF no encontrado, usando defecto');
+        console.log('ℹ️ IRPF no encontrado en localStorage, usando defecto');
         return 15; // Defecto
       }
     } catch (error) {
@@ -1341,27 +1335,18 @@ const SheetsAPI = {
   },
 
   /**
-   * Recupera todas las primas personalizadas del usuario desde Google Sheets
+   * Recupera todas las primas personalizadas del usuario desde localStorage
+   * NOTA: Se guarda en Sheets como backup pero se lee desde localStorage por CORS
    */
   async getPrimasPersonalizadas(chapa) {
     try {
-      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'getPrimasPersonalizadas',
-          chapa: chapa
-        })
-      });
+      // Leer desde localStorage (fuente principal)
+      const primas = localStorage.getItem('primas_personalizadas') || '{}';
+      const primasObj = JSON.parse(primas);
+      const primasArray = Object.values(primasObj);
 
-      const result = await response.json();
-      if (result.success) {
-        console.log(`✅ ${result.data.length} primas recuperadas de Sheets`);
-        return result.data;
-      } else {
-        console.log('ℹ️ No hay primas personalizadas');
-        return [];
-      }
+      console.log(`✅ ${primasArray.length} primas recuperadas de localStorage`);
+      return primasArray;
     } catch (error) {
       console.error('❌ Error en getPrimasPersonalizadas:', error);
       return [];
@@ -1399,27 +1384,17 @@ const SheetsAPI = {
   },
 
   /**
-   * Recupera todos los jornales manuales del usuario desde Google Sheets
+   * Recupera todos los jornales manuales del usuario desde localStorage
+   * NOTA: Se guarda en Sheets como backup pero se lee desde localStorage por CORS
    */
   async getJornalesManuales(chapa) {
     try {
-      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'getJornalesManuales',
-          chapa: chapa
-        })
-      });
+      // Leer desde localStorage (fuente principal)
+      const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+      const jornalesManuales = historico.filter(j => j.manual === true && j.chapa === chapa);
 
-      const result = await response.json();
-      if (result.success) {
-        console.log(`✅ ${result.data.length} jornales manuales recuperados de Sheets`);
-        return result.data;
-      } else {
-        console.log('ℹ️ No hay jornales manuales');
-        return [];
-      }
+      console.log(`✅ ${jornalesManuales.length} jornales manuales recuperados de localStorage`);
+      return jornalesManuales;
     } catch (error) {
       console.error('❌ Error en getJornalesManuales:', error);
       return [];
