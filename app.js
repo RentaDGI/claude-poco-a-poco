@@ -2595,6 +2595,41 @@ async function loadSueldometro() {
       return 64.31;
     };
 
+    // Función auxiliar para calcular tarifa de horas de remate (Grupo I por defecto)
+    const calcularTarifaRemate = (jornada, tipoDia) => {
+      const tarifasRemate = {
+        '02-08': {
+          'LABORABLE': 61.40,
+          'FEST. A LAB.': 70.36,
+          'FESTIVO': 110.57,
+          'FEST. A FEST.': 120.53
+        },
+        '06-12': {
+          'LABORABLE': 41.13,
+          'FESTIVO': 60.92
+        },
+        '08-14': {
+          'LABORABLE': 29.02,
+          'SABADO': 52.24,
+          'FESTIVO': 75.46
+        },
+        '14-20': {
+          'LABORABLE': 43.51,
+          'SABADO': 78.37,
+          'FESTIVO': 110.99
+        },
+        '20-02': {
+          'LABORABLE': 43.51,
+          'LAB A FEST': 99.25,
+          'SABADO': 76.85,
+          'FEST. A LAB.': 88.20,
+          'FEST. A FEST.': 99.60
+        }
+      };
+
+      return tarifasRemate[jornada]?.[tipoDia] || null;
+    };
+
     // Cargar valores bloqueados de localStorage
     const lockedValuesKey = `locked_values_${AppState.currentUser}`;
     let lockedValues = {};
@@ -2684,6 +2719,7 @@ async function loadSueldometro() {
                 <th>Movimientos</th>
                 <th>Prima</th>
                 <th>H. Relevo</th>
+                <th>H. Remate</th>
                 <th>Bruto</th>
                 <th>Neto</th>
               </tr>
@@ -2698,6 +2734,7 @@ async function loadSueldometro() {
                 const movimientosValue = lockedData.movimientos !== undefined ? lockedData.movimientos : 120;
                 const primaValue = lockedData.prima !== undefined ? lockedData.prima : j.prima;
                 const horasRelevoValue = lockedData.horasRelevo !== undefined ? lockedData.horasRelevo : 0;
+                const horasRemateValue = lockedData.horasRemate !== undefined ? lockedData.horasRemate : 0;
                 const movimientosLocked = lockedData.movimientosLocked || false;
                 const primaLocked = lockedData.primaLocked || false;
 
@@ -2710,7 +2747,11 @@ async function loadSueldometro() {
                 const tarifaRelevo = calcularTarifaRelevo(j.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), j.tipo_dia);
                 const importeRelevo = tarifaRelevo ? (horasRelevoValue * tarifaRelevo) : 0;
 
-                const bruto = j.salario_base + primaRecalculada + importeRelevo;
+                // Calcular tarifa de remate
+                const tarifaRemate = calcularTarifaRemate(j.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), j.tipo_dia);
+                const importeRemate = tarifaRemate ? (horasRemateValue * tarifaRemate) : 0;
+
+                const bruto = j.salario_base + primaRecalculada + importeRelevo + importeRemate;
                 const neto = bruto * (1 - irpfPorcentaje / 100);
 
                 return `
@@ -2774,6 +2815,24 @@ async function loadSueldometro() {
                         </label>
                       </div>
                       <div style="font-size: 0.75rem; color: #666; font-weight: 600;">= ${importeRelevo.toFixed(2)}€</div>
+                    ` : `
+                      <span class="text-muted">N/A</span>
+                    `}
+                  </td>
+                  <td>
+                    ${tarifaRemate !== null ? `
+                      <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem;">
+                        <select
+                          class="remate-select"
+                          data-jornal-index="${idx}"
+                          style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; cursor: pointer;"
+                        >
+                          <option value="0" ${horasRemateValue === 0 ? 'selected' : ''}>0h</option>
+                          <option value="1" ${horasRemateValue === 1 ? 'selected' : ''}>1h (${tarifaRemate.toFixed(2)}€)</option>
+                          <option value="2" ${horasRemateValue === 2 ? 'selected' : ''}>2h (${(tarifaRemate * 2).toFixed(2)}€)</option>
+                        </select>
+                        <div style="font-size: 0.75rem; color: #666; font-weight: 600;">= ${importeRemate.toFixed(2)}€</div>
+                      </div>
                     ` : `
                       <span class="text-muted">N/A</span>
                     `}
@@ -2863,12 +2922,18 @@ async function loadSueldometro() {
           }
 
           // Calcular horas de relevo
-          const relevoInput = row.querySelector('.relevo-input');
-          const horasRelevo = parseFloat(relevoInput?.value || 0);
+          const relevoCheckbox = row.querySelector('.relevo-checkbox');
+          const horasRelevo = relevoCheckbox?.checked ? 1 : 0;
           const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
           const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
 
-          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo;
+          // Calcular horas de remate
+          const remateSelect = row.querySelector('.remate-select');
+          const horasRemate = remateSelect ? parseInt(remateSelect.value) : 0;
+          const tarifaRemate = calcularTarifaRemate(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRemate = tarifaRemate ? (horasRemate * tarifaRemate) : 0;
+
+          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo + importeRemate;
           const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
@@ -2900,12 +2965,18 @@ async function loadSueldometro() {
           saveLockedValues();
 
           // Calcular horas de relevo
-          const relevoInput = row.querySelector('.relevo-input');
-          const horasRelevo = parseFloat(relevoInput?.value || 0);
+          const relevoCheckbox = row.querySelector('.relevo-checkbox');
+          const horasRelevo = relevoCheckbox?.checked ? 1 : 0;
           const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
           const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
 
-          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo;
+          // Calcular horas de remate
+          const remateSelect = row.querySelector('.remate-select');
+          const horasRemate = remateSelect ? parseInt(remateSelect.value) : 0;
+          const tarifaRemate = calcularTarifaRemate(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRemate = tarifaRemate ? (horasRemate * tarifaRemate) : 0;
+
+          const nuevoTotal = jornal.salario_base + nuevaPrima + importeRelevo + importeRemate;
           const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
@@ -2945,7 +3016,13 @@ async function loadSueldometro() {
           const primaInput = row.querySelector('.prima-input');
           const prima = parseFloat(primaInput?.value || 0);
 
-          const nuevoTotal = jornal.salario_base + prima + importeRelevo;
+          // Obtener horas de remate actuales
+          const remateSelect = row.querySelector('.remate-select');
+          const horasRemate = remateSelect ? parseInt(remateSelect.value) : 0;
+          const tarifaRemate = calcularTarifaRemate(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRemate = tarifaRemate ? (horasRemate * tarifaRemate) : 0;
+
+          const nuevoTotal = jornal.salario_base + prima + importeRelevo + importeRemate;
           const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
 
           // Actualizar la fila con animación
@@ -2956,6 +3033,57 @@ async function loadSueldometro() {
           const importeRelevoText = row.querySelector('td:nth-child(7) > div:last-child');
           if (importeRelevoText) {
             importeRelevoText.textContent = `= ${importeRelevo.toFixed(2)}€`;
+          }
+
+          row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
+          row.querySelector('.neto-value strong').textContent = `${nuevoNeto.toFixed(2)}€`;
+
+          // Actualizar el jornal en el array
+          jornal.total = nuevoTotal;
+
+          actualizarTotales();
+        });
+      });
+
+      // Event listener para selector de horas de remate
+      card.querySelectorAll('.remate-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const horasRemate = parseInt(e.target.value);
+          const jornalIndex = parseInt(e.target.dataset.jornalIndex);
+          const jornal = jornalesConSalarioQuincena[jornalIndex];
+          const row = e.target.closest('tr');
+          const lockKey = row.dataset.lockKey;
+
+          // Guardar horas de remate en localStorage
+          if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+          lockedValues[lockKey].horasRemate = horasRemate;
+          saveLockedValues();
+
+          // Calcular tarifa de remate
+          const tarifaRemate = calcularTarifaRemate(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRemate = tarifaRemate ? (horasRemate * tarifaRemate) : 0;
+
+          // Obtener prima actual
+          const primaInput = row.querySelector('.prima-input');
+          const prima = parseFloat(primaInput?.value || 0);
+
+          // Obtener horas de relevo actuales
+          const relevoCheckbox = row.querySelector('.relevo-checkbox');
+          const horasRelevo = relevoCheckbox?.checked ? 1 : 0;
+          const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
+          const importeRelevo = tarifaRelevo ? (horasRelevo * tarifaRelevo) : 0;
+
+          const nuevoTotal = jornal.salario_base + prima + importeRelevo + importeRemate;
+          const nuevoNeto = nuevoTotal * (1 - irpfPorcentaje / 100);
+
+          // Actualizar la fila con animación
+          row.classList.add('updating');
+          setTimeout(() => row.classList.remove('updating'), 600);
+
+          // Actualizar el importe de remate mostrado
+          const importeRemateText = row.querySelector('td:nth-child(8) > div > div:last-child');
+          if (importeRemateText) {
+            importeRemateText.textContent = `= ${importeRemate.toFixed(2)}€`;
           }
 
           row.querySelector('.bruto-value strong').textContent = `${nuevoTotal.toFixed(2)}€`;
@@ -3489,7 +3617,6 @@ function initForoEnhanced() {
   const sendBtn = document.getElementById('foro-send');
   const foroInput = document.getElementById('foro-input');
   const charCount = document.getElementById('foro-char-count');
-  const refreshBtn = document.getElementById('foro-refresh');
 
   if (!sendBtn || !foroInput) return;
 
@@ -3524,30 +3651,6 @@ function initForoEnhanced() {
       }
     }
   });
-
-  // Botón de refresh
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      const svg = refreshBtn.querySelector('svg');
-      if (svg) svg.style.animation = 'spin 0.5s ease';
-
-      await loadForo();
-
-      // Auto-scroll al final
-      const container = document.getElementById('foro-messages');
-      if (container) {
-        setTimeout(() => {
-          container.scrollTop = container.scrollHeight;
-        }, 100);
-      }
-
-      if (svg) {
-        setTimeout(() => {
-          svg.style.animation = '';
-        }, 500);
-      }
-    });
-  }
 }
 
 // Inicializar al cargar el DOM
