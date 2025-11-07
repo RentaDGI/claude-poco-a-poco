@@ -1916,8 +1916,8 @@ function renderForoMessages(messages) {
 
   container.innerHTML = '';
 
-  // Ordenar por timestamp (más ANTIGUOS primero, recientes abajo)
-  const sorted = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  // Ordenar por timestamp (más RECIENTES primero, arriba)
+  const sorted = messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   // Obtener nombres de usuarios del cache
   const usuariosCache = JSON.parse(localStorage.getItem('usuarios_cache') || '{}');
@@ -1956,11 +1956,6 @@ function renderForoMessages(messages) {
 
     container.appendChild(messageDiv);
   });
-
-  // Auto-scroll al final para mostrar mensajes más recientes
-  setTimeout(() => {
-    container.scrollTop = container.scrollHeight;
-  }, 100);
 }
 
 /**
