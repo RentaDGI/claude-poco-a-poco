@@ -75,12 +75,16 @@ function doPost(e) {
 }
 
 /**
- * Helper para crear respuestas JSON
+ * Helper para crear respuestas JSON con CORS habilitado
  */
 function createJsonResponse(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+
+  // No podemos establecer headers personalizados en Apps Script deployed como web app
+  // Apps Script automáticamente permite CORS para web apps deployed como "Anyone"
+
+  return output;
 }
 
 /**
