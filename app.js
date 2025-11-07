@@ -3426,17 +3426,17 @@ function initReportJornal() {
     const emailBody = `Jornal Faltante Reportado:
 
 Fecha\tChapa\tPuesto_Contratacion\tJornada\tEmpresa\tBuque\tParte
-${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value.trim()}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
+${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
 
 ---
 Para copiar a la hoja de cálculo:
-${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value.trim()}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
+${fechaFormateada}\t${chapaInput.value}\t${puestoFinal}\t${jornadaSelect.value}\t${empresaInput.value}\t${buqueInput.value.trim() || '--'}\t${parteInput.value}
 
 Enviado desde Portal Estiba VLC`;
 
     try {
       // Crear enlace mailto
-      const mailtoLink = `portalestibavlc@gmail.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      const mailtoLink = `mailto:portalestibavlc@gmail.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
       // Abrir cliente de correo
       window.location.href = mailtoLink;
@@ -3458,10 +3458,99 @@ Enviado desde Portal Estiba VLC`;
   });
 }
 
+/**
+ * Inicializa funcionalidades mejoradas del foro
+ */
+function initForoEnhanced() {
+  const sendBtn = document.getElementById('foro-send');
+  const foroInput = document.getElementById('foro-input');
+  const charCount = document.getElementById('foro-char-count');
+  const searchInput = document.getElementById('foro-search');
+  const refreshBtn = document.getElementById('foro-refresh');
+
+  if (!sendBtn || !foroInput) return;
+
+  // Evento de enviar mensaje
+  sendBtn.addEventListener('click', sendForoMessage);
+
+  // Enviar con Ctrl+Enter o Cmd+Enter
+  foroInput.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      sendForoMessage();
+    }
+  });
+
+  // Contador de caracteres
+  foroInput.addEventListener('input', () => {
+    const length = foroInput.value.length;
+    if (charCount) {
+      charCount.textContent = `${length}/500`;
+
+      if (length > 500) {
+        charCount.classList.add('error');
+        charCount.classList.remove('warning');
+        sendBtn.disabled = true;
+      } else if (length > 450) {
+        charCount.classList.add('warning');
+        charCount.classList.remove('error');
+        sendBtn.disabled = false;
+      } else {
+        charCount.classList.remove('warning', 'error');
+        sendBtn.disabled = false;
+      }
+    }
+  });
+
+  // Búsqueda de mensajes
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const messages = document.querySelectorAll('.foro-message');
+
+      messages.forEach(msg => {
+        const text = msg.querySelector('.foro-message-text')?.textContent.toLowerCase() || '';
+        const chapa = msg.querySelector('.foro-message-chapa')?.textContent.toLowerCase() || '';
+
+        if (text.includes(query) || chapa.includes(query) || query === '') {
+          msg.style.display = '';
+        } else {
+          msg.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  // Botón de refresh
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      const svg = refreshBtn.querySelector('svg');
+      if (svg) svg.style.animation = 'spin 0.5s ease';
+
+      await loadForo();
+
+      // Auto-scroll al final
+      const container = document.getElementById('foro-messages');
+      if (container) {
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight;
+        }, 100);
+      }
+
+      if (svg) {
+        setTimeout(() => {
+          svg.style.animation = '';
+        }, 500);
+      }
+    });
+  }
+}
+
 // Inicializar al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
   initAddJornalManual();
   initReportJornal();
+  initForoEnhanced();
 });
 
 
