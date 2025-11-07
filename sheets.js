@@ -1314,9 +1314,10 @@ const SheetsAPI = {
   },
 
   /**
-   * Guarda una prima personalizada en Google Sheets
+   * Guarda datos personalizados de un jornal en Google Sheets
+   * Incluye: prima, movimientos, relevo, remate
    */
-  async savePrimaPersonalizada(chapa, fecha, jornada, prima, movimientos = null) {
+  async savePrimaPersonalizada(chapa, fecha, jornada, prima, movimientos = null, relevo = 0, remate = 0) {
     try {
       const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
         method: 'POST',
@@ -1327,16 +1328,18 @@ const SheetsAPI = {
           fecha: fecha,
           jornada: jornada,
           prima: prima,
-          movimientos: movimientos
+          movimientos: movimientos,
+          relevo: relevo,
+          remate: remate
         })
       });
 
       const result = await response.json();
       if (result.success) {
-        console.log('✅ Prima guardada en Sheets:', result);
+        console.log('✅ Datos del jornal guardados en Sheets:', result);
         return true;
       } else {
-        console.error('❌ Error guardando prima:', result.message);
+        console.error('❌ Error guardando datos del jornal:', result.message);
         return false;
       }
     } catch (error) {

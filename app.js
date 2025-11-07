@@ -2718,8 +2718,39 @@ async function loadSueldometro() {
     }
 
     // Función para guardar valores bloqueados
-    const saveLockedValues = () => {
+    let saveTimeout = null;
+    const saveLockedValues = (fecha = null, jornada = null) => {
+      // Guardar en localStorage (caché local)
       localStorage.setItem(lockedValuesKey, JSON.stringify(lockedValues));
+
+      // Si se proporciona fecha y jornada, guardar también en Sheets
+      if (fecha && jornada) {
+        // Debounce: esperar 1 segundo antes de guardar en Sheets
+        if (saveTimeout) clearTimeout(saveTimeout);
+
+        saveTimeout = setTimeout(() => {
+          const key = `${fecha}_${jornada}`;
+          const datos = lockedValues[key];
+
+          if (datos) {
+            SheetsAPI.savePrimaPersonalizada(
+              AppState.currentUser,
+              fecha,
+              jornada,
+              datos.prima || 0,
+              datos.movimientos || 0,
+              datos.horasRelevo || 0,
+              datos.horasRemate || 0
+            ).then(success => {
+              if (success) {
+                console.log(`✅ Datos sincronizados con Sheets: ${fecha} ${jornada}`);
+              }
+            }).catch(err => {
+              console.error('Error sincronizando con Sheets:', err);
+            });
+          }
+        }, 1000); // 1 segundo de debounce
+      }
     };
 
     quincenasArray.forEach(({ year, month, quincena, jornales: jornalesQuincena }) => {
@@ -2802,7 +2833,8 @@ async function loadSueldometro() {
             <tbody id="tbody-${year}-${month}-${quincena}">
               ${jornalesConSalarioQuincena.map((j, idx) => {
                 const rowId = `row-${year}-${month}-${quincena}-${idx}`;
-                const lockKey = `${year}-${month}-${quincena}-${idx}`;
+                // NUEVA CLAVE: Usar fecha_jornada para identificación única
+                const lockKey = `${j.fecha}_${j.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '')}`;
 
                 // Cargar valores bloqueados o usar defaults
                 const lockedData = lockedValues[lockKey] || {};
@@ -2830,7 +2862,7 @@ async function loadSueldometro() {
                 const neto = bruto * (1 - irpfPorcentaje / 100);
 
                 return `
-                <tr id="${rowId}" data-row-index="${idx}" data-lock-key="${lockKey}">
+                <tr id="${rowId}" data-row-index="${idx}" data-lock-key="${lockKey}" data-fecha="${j.fecha}" data-jornada="${j.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, '')}">
                   <td>${j.fecha}</td>
                   <td><span class="badge badge-${j.jornada.replace(/\s+/g, '')}">${j.jornada}</span></td>
                   <td>${j.puesto_display}</td>
@@ -2968,11 +3000,13 @@ async function loadSueldometro() {
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
 
-          // Guardar movimientos en localStorage
+          // Guardar movimientos en localStorage y Sheets
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           lockedValues[lockKey].movimientos = movimientos;
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // Recalcular prima según movimientos (solo si no está bloqueada)
           const primaInput = row.querySelector('.prima-input');
@@ -3033,11 +3067,13 @@ async function loadSueldometro() {
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
 
-          // Guardar prima en localStorage
+          // Guardar prima en localStorage y Sheets
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           lockedValues[lockKey].prima = nuevaPrima;
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // NUEVO: Recalcular movimientos basado en la prima (si es operativa de contenedor)
           const movimientosInput = row.querySelector('.movimientos-input');
@@ -3064,10 +3100,10 @@ async function loadSueldometro() {
               // Actualizar input de movimientos
               movimientosInput.value = movimientosCalculados;
 
-              // Guardar en localStorage
+              // Guardar en localStorage y Sheets
               if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
               lockedValues[lockKey].movimientos = movimientosCalculados;
-              saveLockedValues();
+              saveLockedValues(fecha, jornada);
             }
           }
 
@@ -3109,11 +3145,13 @@ async function loadSueldometro() {
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
 
-          // Guardar horas de relevo en localStorage
+          // Guardar horas de relevo en localStorage y Sheets
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           lockedValues[lockKey].horasRelevo = horasRelevo;
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // Calcular tarifa de relevo
           const tarifaRelevo = calcularTarifaRelevo(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
@@ -3160,11 +3198,13 @@ async function loadSueldometro() {
           const jornal = jornalesConSalarioQuincena[jornalIndex];
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
 
-          // Guardar horas de remate en localStorage
+          // Guardar horas de remate en localStorage y Sheets
           if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
           lockedValues[lockKey].horasRemate = horasRemate;
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // Calcular tarifa de remate
           const tarifaRemate = calcularTarifaRemate(jornal.jornada.replace(/\s+a\s+/g, '-').replace(/\s+/g, ''), jornal.tipo_dia);
@@ -3210,6 +3250,8 @@ async function loadSueldometro() {
           const jornalIndex = parseInt(e.target.dataset.jornalIndex);
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
           const movimientosInput = row.querySelector('.movimientos-input');
           const primaInput = row.querySelector('.prima-input');
           const primaLockBtn = row.querySelector('.prima-lock-btn');
@@ -3221,7 +3263,7 @@ async function loadSueldometro() {
           lockedValues[lockKey].primaLocked = !isLocked; // Sincronizar con prima
           lockedValues[lockKey].movimientos = parseFloat(movimientosInput.value) || 120;
           lockedValues[lockKey].prima = parseFloat(primaInput.value) || 0;
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // Actualizar UI de movimientos
           btn.textContent = !isLocked ? '🔒' : '🔓';
@@ -3252,6 +3294,8 @@ async function loadSueldometro() {
           const jornalIndex = parseInt(e.target.dataset.jornalIndex);
           const row = e.target.closest('tr');
           const lockKey = row.dataset.lockKey;
+          const fecha = row.dataset.fecha;
+          const jornada = row.dataset.jornada;
           const primaInput = row.querySelector('.prima-input');
           const movimientosInput = row.querySelector('.movimientos-input');
           const movimientosLockBtn = row.querySelector('.movimientos-lock-btn');
@@ -3265,7 +3309,7 @@ async function loadSueldometro() {
           if (movimientosInput) {
             lockedValues[lockKey].movimientos = parseFloat(movimientosInput.value) || 120;
           }
-          saveLockedValues();
+          saveLockedValues(fecha, jornada);
 
           // Actualizar UI de prima
           btn.textContent = !isLocked ? '🔒' : '🔓';
