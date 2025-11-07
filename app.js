@@ -2302,6 +2302,11 @@ function determinarTipoDia(fecha, jornada) {
     const esFestivoManana = esFestivoFecha(diaSiguiente);
 
     if (jornada === '02-08') {
+      // EXCEPCIÓN: Sábado siempre es LABORABLE en jornada 02-08
+      if (dayOfWeek === 6) {
+        return 'LABORABLE';
+      }
+
       // Jornada 02-08: empieza de noche y termina por la mañana
       if (esFestivoHoy && !esFestivoManana) {
         return 'FEST-LAB';
