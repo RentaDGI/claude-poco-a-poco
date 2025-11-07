@@ -274,18 +274,20 @@
         </div>
       </div>
       <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-          <div id="jornales-stats" class="stats-grid" style="flex: 1;"></div>
-          <button id="add-jornal-btn" class="btn-add-jornal" title="Añadir jornal manualmente">
-            ➕ Añadir Jornal Manual
-          </button>
-        </div>
+        <div id="jornales-stats" class="stats-grid"></div>
         <div id="jornales-loading" class="loading-state">
           <div class="spinner"></div>
           <p>Cargando jornales...</p>
         </div>
         <div id="jornales-content"></div>
       </div>
+
+      <!-- Botón flotante para añadir jornal -->
+      <button id="add-jornal-btn" class="fab-add-jornal" title="Añadir jornal manualmente">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
     </section>
 
     <!-- PÁGINA SUELDÓMETRO -->

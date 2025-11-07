@@ -1750,26 +1750,65 @@ body::before {
   font-style: italic;
 }
 
-.btn-add-jornal {
+/* Botón flotante circular (FAB - Floating Action Button) */
+.fab-add-jornal {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 64px;
+  height: 64px;
   background: linear-gradient(135deg, var(--puerto-blue) 0%, var(--puerto-blue-dark) 100%);
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(10, 46, 92, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(10, 46, 92, 0.3), 0 2px 4px rgba(10, 46, 92, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 900;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0);
 }
 
-.btn-add-jornal:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(10, 46, 92, 0.3);
+/* Mostrar FAB solo en página de jornales */
+#page-jornales.active .fab-add-jornal {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
 }
 
-.btn-add-jornal:active {
-  transform: translateY(0);
+.fab-add-jornal svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.5;
+}
+
+.fab-add-jornal:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 6px 20px rgba(10, 46, 92, 0.4), 0 3px 8px rgba(10, 46, 92, 0.3);
+}
+
+.fab-add-jornal:active {
+  transform: scale(0.95) rotate(90deg);
+  box-shadow: 0 2px 8px rgba(10, 46, 92, 0.3);
+}
+
+/* Responsive para móvil */
+@media (max-width: 768px) {
+  .fab-add-jornal {
+    width: 56px;
+    height: 56px;
+    bottom: 1.5rem;
+    right: 1.5rem;
+  }
+
+  .fab-add-jornal svg {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 /* Botones de candado */
