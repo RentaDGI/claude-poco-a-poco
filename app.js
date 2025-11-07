@@ -2404,20 +2404,34 @@ async function loadSueldometro() {
     // 1. Cargar datos necesarios
     console.log('📊 Cargando datos del Sueldómetro...');
 
-    const [jornalesSheets, mapeoPuestos, tablaSalarial] = await Promise.all([
+    const [jornalesSheets, jornalesManualesSheets, mapeoPuestos, tablaSalarial] = await Promise.all([
       SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
+      SheetsAPI.getJornalesManuales(AppState.currentUser),
       SheetsAPI.getMapeoPuestos(),
       SheetsAPI.getTablaSalarial()
     ]);
 
-    // 1.1 Cargar jornales manuales de localStorage
-    const jornalesManuales = JSON.parse(localStorage.getItem('jornales_historico') || '[]')
-      .filter(j => j.manual === true); // Solo los marcados como manuales
+    // 1.1 Cargar jornales manuales de localStorage como fallback
+    const jornalesManualesLocal = JSON.parse(localStorage.getItem('jornales_historico') || '[]')
+      .filter(j => j.manual === true);
 
-    // 1.2 Mezclar jornales de Sheets con jornales manuales
-    const jornales = [...jornalesSheets, ...jornalesManuales];
+    // 1.2 Mezclar jornales de Sheets (histórico + manuales) + manuales locales
+    // Evitar duplicados comparando fecha+jornada+puesto
+    const jornalesManualesMerged = [...jornalesManualesSheets];
+    jornalesManualesLocal.forEach(jLocal => {
+      const existe = jornalesManualesSheets.some(jSheet =>
+        jSheet.fecha === jLocal.fecha &&
+        jSheet.jornada === jLocal.jornada &&
+        jSheet.puesto === jLocal.puesto
+      );
+      if (!existe) {
+        jornalesManualesMerged.push(jLocal);
+      }
+    });
 
-    console.log(`✅ Datos cargados: ${jornalesSheets.length} jornales de Sheets + ${jornalesManuales.length} manuales = ${jornales.length} total`);
+    const jornales = [...jornalesSheets, ...jornalesManualesMerged];
+
+    console.log(`✅ Datos cargados: ${jornalesSheets.length} histórico + ${jornalesManualesSheets.length} manuales (Sheets) + ${jornalesManualesLocal.length - jornalesManualesSheets.length} manuales (local) = ${jornales.length} total`);
     console.log(`   ${mapeoPuestos.length} puestos, ${tablaSalarial.length} salarios`);
 
     if (jornales.length === 0) {
@@ -3612,10 +3626,28 @@ function initAddJornalManual() {
       // Guardar en localStorage
       localStorage.setItem('jornales_historico', JSON.stringify(historico));
 
-      console.log('✅ Jornal guardado correctamente');
+      // Guardar también en Google Sheets para persistencia permanente
+      SheetsAPI.saveJornalManual(
+        AppState.currentUser,
+        nuevoJornal.fecha,
+        nuevoJornal.jornada,
+        nuevoJornal.tipo_dia,
+        nuevoJornal.puesto,
+        nuevoJornal.empresa,
+        nuevoJornal.buque,
+        nuevoJornal.parte
+      ).then(success => {
+        if (success) {
+          console.log('✅ Jornal también guardado en Google Sheets');
+        }
+      }).catch(err => {
+        console.error('❌ Error guardando en Sheets (continuando):', err);
+      });
+
+      console.log('✅ Jornal guardado correctamente en localStorage');
 
       // Mostrar mensaje de éxito
-      successMsg.textContent = '✅ Jornal añadido correctamente';
+      successMsg.textContent = '✅ Jornal añadido correctamente y guardado permanentemente';
       successMsg.style.display = 'block';
 
       // Recargar automáticamente las vistas

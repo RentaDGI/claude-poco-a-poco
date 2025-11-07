@@ -1366,6 +1366,64 @@ const SheetsAPI = {
       console.error('❌ Error en getPrimasPersonalizadas:', error);
       return [];
     }
+  },
+
+  /**
+   * Guarda un jornal manual en Google Sheets
+   */
+  async saveJornalManual(chapa, fecha, jornada, tipo_dia, puesto, empresa, buque = '--', parte = '1') {
+    try {
+      await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'saveJornalManual',
+          chapa: chapa,
+          fecha: fecha,
+          jornada: jornada,
+          tipo_dia: tipo_dia,
+          puesto: puesto,
+          empresa: empresa,
+          buque: buque,
+          parte: parte
+        })
+      });
+
+      console.log(`✅ Jornal manual enviado a Sheets: ${fecha} ${jornada} (no-cors mode)`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error en saveJornalManual:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Recupera todos los jornales manuales del usuario desde Google Sheets
+   */
+  async getJornalesManuales(chapa) {
+    try {
+      const response = await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'getJornalesManuales',
+          chapa: chapa
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log(`✅ ${result.data.length} jornales manuales recuperados de Sheets`);
+        return result.data;
+      } else {
+        console.log('ℹ️ No hay jornales manuales');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error en getJornalesManuales:', error);
+      return [];
+    }
   }
 };
 

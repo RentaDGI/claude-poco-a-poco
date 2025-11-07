@@ -10,7 +10,8 @@
 const CONFIG = {
   HOJAS: {
     CONFIGURACION_USUARIO: 'Configuracion_Usuario',
-    PRIMAS_PERSONALIZADAS: 'Primas_Personalizadas'
+    PRIMAS_PERSONALIZADAS: 'Primas_Personalizadas',
+    JORNALES_MANUALES: 'Jornales_Manuales'
   }
 };
 
@@ -50,7 +51,9 @@ function doPost(e) {
       'saveUserConfig': saveUserConfig,
       'getUserConfig': getUserConfig,
       'savePrimaPersonalizada': savePrimaPersonalizada,
-      'getPrimasPersonalizadas': getPrimasPersonalizadas
+      'getPrimasPersonalizadas': getPrimasPersonalizadas,
+      'saveJornalManual': saveJornalManual,
+      'getJornalesManuales': getJornalesManuales
     };
 
     const handler = handlers[action];
@@ -330,6 +333,145 @@ function getPrimasPersonalizadas(params) {
 
   } catch (error) {
     Logger.log(`❌ Error en getPrimasPersonalizadas: ${error.message}`);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * ==========================================
+ * GESTIÓN DE JORNALES MANUALES
+ * ==========================================
+ */
+
+/**
+ * Guarda un jornal añadido manualmente por el usuario
+ *
+ * Estructura de la hoja Jornales_Manuales:
+ * Columna A: Chapa
+ * Columna B: Fecha (DD/MM/YYYY)
+ * Columna C: Jornada (ej: "08 a 14")
+ * Columna D: Tipo_Dia (ej: "LABORABLE", "SABADO", "FESTIVO")
+ * Columna E: Puesto
+ * Columna F: Empresa
+ * Columna G: Buque
+ * Columna H: Parte
+ * Columna I: Fecha_Creacion
+ */
+function saveJornalManual(params) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_MANUALES);
+
+    // Crear hoja si no existe
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.HOJAS.JORNALES_MANUALES);
+      sheet.appendRow(['Chapa', 'Fecha', 'Jornada', 'Tipo_Dia', 'Puesto', 'Empresa', 'Buque', 'Parte', 'Fecha_Creacion']);
+      Logger.log('✅ Hoja Jornales_Manuales creada');
+    }
+
+    const chapa = params.chapa;
+    const fecha = params.fecha;
+    const jornada = params.jornada;
+    const tipo_dia = params.tipo_dia;
+    const puesto = params.puesto;
+    const empresa = params.empresa;
+    const buque = params.buque || '--';
+    const parte = params.parte || '1';
+    const fechaCreacion = new Date();
+
+    // Validar parámetros requeridos
+    if (!chapa || !fecha || !jornada || !tipo_dia || !puesto || !empresa) {
+      throw new Error('Faltan parámetros requeridos');
+    }
+
+    // Verificar si ya existe (evitar duplicados)
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == chapa && data[i][1] == fecha && data[i][2] == jornada && data[i][4] == puesto) {
+        Logger.log(`⚠️ Jornal duplicado detectado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+        return {
+          success: false,
+          message: 'Este jornal ya existe'
+        };
+      }
+    }
+
+    // Añadir nueva fila
+    sheet.appendRow([
+      chapa,
+      fecha,
+      jornada,
+      tipo_dia,
+      puesto,
+      empresa,
+      buque,
+      parte,
+      fechaCreacion
+    ]);
+
+    Logger.log(`✅ Jornal manual guardado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+
+    return {
+      success: true,
+      message: 'Jornal guardado correctamente'
+    };
+
+  } catch (error) {
+    Logger.log(`❌ Error en saveJornalManual: ${error.message}`);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Obtiene todos los jornales manuales de un usuario
+ */
+function getJornalesManuales(params) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_MANUALES);
+
+    if (!sheet) {
+      return {
+        success: true,
+        message: 'Hoja Jornales_Manuales no encontrada',
+        data: []
+      };
+    }
+
+    const chapa = params.chapa;
+
+    if (!chapa) {
+      throw new Error('Falta parámetro requerido: chapa');
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const jornales = [];
+
+    // Recorrer todas las filas y recopilar jornales del usuario
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == chapa) {
+        jornales.push({
+          fecha: data[i][1],
+          jornada: data[i][2],
+          tipo_dia: data[i][3],
+          puesto: data[i][4],
+          empresa: data[i][5],
+          buque: data[i][6],
+          parte: data[i][7],
+          manual: true // Marcar como manual
+        });
+      }
+    }
+
+    Logger.log(`✅ Recuperados ${jornales.length} jornales manuales para chapa ${chapa}`);
+
+    return {
+      success: true,
+      data: jornales
+    };
+
+  } catch (error) {
+    Logger.log(`❌ Error en getJornalesManuales: ${error.message}`);
     return { success: false, message: error.message };
   }
 }
