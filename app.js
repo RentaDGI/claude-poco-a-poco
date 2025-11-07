@@ -2969,6 +2969,38 @@ async function loadSueldometro() {
           lockedValues[lockKey].prima = nuevaPrima;
           saveLockedValues();
 
+          // NUEVO: Recalcular movimientos basado en la prima (si es operativa de contenedor)
+          const movimientosInput = row.querySelector('.movimientos-input');
+          const movimientosLockBtn = row.querySelector('.movimientos-lock-btn');
+          const movimientosLocked = movimientosLockBtn && movimientosLockBtn.textContent === '🔒';
+
+          if (movimientosInput && jornal.tipo_operativa === 'Contenedor' && !movimientosLocked) {
+            const salarioInfo = tablaSalarial.find(s => s.clave_jornada === jornal.clave_jornada);
+
+            if (salarioInfo) {
+              // Calcular movimientos a partir de prima (inverso de la fórmula)
+              // Primero intentar con coeficiente menor (<120)
+              const movimientosMenor = nuevaPrima / salarioInfo.coef_prima_menor120;
+
+              let movimientosCalculados;
+              if (movimientosMenor < 120) {
+                // Si los movimientos calculados son < 120, usar ese coeficiente
+                movimientosCalculados = Math.round(movimientosMenor);
+              } else {
+                // Si no, usar coeficiente mayor (>=120)
+                movimientosCalculados = Math.round(nuevaPrima / salarioInfo.coef_prima_mayor120);
+              }
+
+              // Actualizar input de movimientos
+              movimientosInput.value = movimientosCalculados;
+
+              // Guardar en localStorage
+              if (!lockedValues[lockKey]) lockedValues[lockKey] = {};
+              lockedValues[lockKey].movimientos = movimientosCalculados;
+              saveLockedValues();
+            }
+          }
+
           // Calcular horas de relevo
           const relevoCheckbox = row.querySelector('.relevo-checkbox');
           const horasRelevo = relevoCheckbox?.checked ? 1 : 0;
