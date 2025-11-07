@@ -1180,14 +1180,22 @@ async function loadJornales() {
     // 1. INTENTAR CARGAR DESDE JORNALES_HISTORICO_ACUMULADO (se actualiza automáticamente cada hora)
     console.log('📥 Cargando jornales desde Jornales_Historico_Acumulado...');
     try {
-      const jornalesAcumulados = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
+      const [jornalesAcumulados, jornalesManualesSheets] = await Promise.all([
+        SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser),
+        SheetsAPI.getJornalesManuales(AppState.currentUser)
+      ]);
 
       if (jornalesAcumulados && jornalesAcumulados.length > 0) {
         console.log(`✅ Cargados ${jornalesAcumulados.length} jornales desde histórico acumulado`);
-        data = jornalesAcumulados;
+        console.log(`✅ Cargados ${jornalesManualesSheets.length} jornales manuales desde Sheets`);
+
+        // Mezclar jornales históricos con manuales
+        data = [...jornalesAcumulados, ...jornalesManualesSheets];
 
         // Guardar en localStorage como caché por si falla la conexión en el futuro
         const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+
+        // Guardar históricos
         jornalesAcumulados.forEach(jornal => {
           const existe = historico.some(h =>
             h.fecha === jornal.fecha &&
@@ -1199,6 +1207,20 @@ async function loadJornales() {
             historico.push(jornal);
           }
         });
+
+        // Guardar manuales
+        jornalesManualesSheets.forEach(jornal => {
+          const existe = historico.some(h =>
+            h.fecha === jornal.fecha &&
+            h.jornada === jornal.jornada &&
+            h.puesto === jornal.puesto &&
+            h.manual === true
+          );
+          if (!existe) {
+            historico.push({ ...jornal, manual: true });
+          }
+        });
+
         localStorage.setItem('jornales_historico', JSON.stringify(historico));
       } else {
         throw new Error('No hay jornales en histórico acumulado, usando localStorage');
