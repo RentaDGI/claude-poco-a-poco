@@ -2286,7 +2286,26 @@ async function loadSueldometro() {
   // Cargar IRPF guardado o usar valor por defecto (15%)
   const irpfKey = `irpf_${AppState.currentUser}`;
   const irpfLockKey = `irpf_locked_${AppState.currentUser}`;
-  let irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+
+  // Intentar cargar desde Google Sheets primero
+  let irpfPorcentaje = 15; // Valor por defecto
+  try {
+    const configUsuario = await SheetsAPI.getUserConfig(AppState.currentUser);
+    if (configUsuario && configUsuario.irpf) {
+      irpfPorcentaje = configUsuario.irpf;
+      console.log(`✅ IRPF cargado desde Sheets: ${irpfPorcentaje}%`);
+      // Sincronizar con localStorage
+      localStorage.setItem(irpfKey, irpfPorcentaje.toString());
+    } else {
+      // Si no hay en Sheets, intentar localStorage
+      irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+      console.log(`📦 IRPF cargado desde localStorage: ${irpfPorcentaje}%`);
+    }
+  } catch (error) {
+    console.error('❌ Error cargando IRPF desde Sheets, usando localStorage:', error);
+    irpfPorcentaje = parseFloat(localStorage.getItem(irpfKey)) || 15;
+  }
+
   let irpfLocked = localStorage.getItem(irpfLockKey) === 'true';
 
   console.log(`💰 IRPF cargado: ${irpfPorcentaje}% (bloqueado: ${irpfLocked})`);
