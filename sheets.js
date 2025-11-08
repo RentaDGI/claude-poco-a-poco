@@ -35,7 +35,7 @@ const SHEETS_CONFIG = {
   URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929',
 
   // URL del Apps Script (Web App deployada) - ACTUALIZADA
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxgwhFR-rb-Lqs9YMPnGEbaLVzVepnGJg3EkkVSNDVCSMaB3p2S2AqNcxHruIzsaHxaNA/exec'
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxn3kv_G0-qDjJwUqOdnOIFMN0zjfz12UbvSdei9VYsJ94y2kVccpFO5ZPF2KSpx862lw/exec'
 };
 
 /**
@@ -725,9 +725,31 @@ const SheetsAPI = {
 
             // Procesar fila completada
             if (currentRow.length >= 3 && !skipHeader) {
-              const timestamp = currentRow[0] ? currentRow[0].trim() : '';
-              const chapa = currentRow[1] ? currentRow[1].trim() : '';
-              const texto = currentRow[2] ? currentRow[2].trim() : '';
+              // Leer columnas
+              let col1 = currentRow[0] ? currentRow[0].trim() : '';
+              let col2 = currentRow[1] ? currentRow[1].trim() : '';
+              let col3 = currentRow[2] ? currentRow[2].trim() : '';
+
+              // CORRECCIÓN AUTOMÁTICA: Detectar si el orden está invertido
+              // Orden correcto: [timestamp, chapa, texto]
+              // Orden incorrecto: [chapa, timestamp, texto]
+              let timestamp, chapa, texto;
+
+              const col1EsNumero = /^\d+$/.test(col1);
+              const col2EsTimestamp = /^\d{4}-\d{2}-\d{2}T/.test(col2);
+
+              if (col1EsNumero && col2EsTimestamp) {
+                // Orden incorrecto detectado - corregir automáticamente
+                timestamp = col2;
+                chapa = col1;
+                texto = col3;
+                console.log('⚠️ Mensaje con columnas invertidas detectado y corregido automáticamente');
+              } else {
+                // Orden correcto
+                timestamp = col1;
+                chapa = col2;
+                texto = col3;
+              }
 
               if (timestamp && chapa && texto) {
                 // Intentar parsear el timestamp
@@ -764,9 +786,29 @@ const SheetsAPI = {
       if (currentField || currentRow.length > 0) {
         currentRow.push(currentField);
         if (currentRow.length >= 3 && !skipHeader) {
-          const timestamp = currentRow[0] ? currentRow[0].trim() : '';
-          const chapa = currentRow[1] ? currentRow[1].trim() : '';
-          const texto = currentRow[2] ? currentRow[2].trim() : '';
+          // Leer columnas
+          let col1 = currentRow[0] ? currentRow[0].trim() : '';
+          let col2 = currentRow[1] ? currentRow[1].trim() : '';
+          let col3 = currentRow[2] ? currentRow[2].trim() : '';
+
+          // CORRECCIÓN AUTOMÁTICA: Detectar si el orden está invertido
+          let timestamp, chapa, texto;
+
+          const col1EsNumero = /^\d+$/.test(col1);
+          const col2EsTimestamp = /^\d{4}-\d{2}-\d{2}T/.test(col2);
+
+          if (col1EsNumero && col2EsTimestamp) {
+            // Orden incorrecto detectado - corregir automáticamente
+            timestamp = col2;
+            chapa = col1;
+            texto = col3;
+            console.log('⚠️ Última fila con columnas invertidas detectada y corregida automáticamente');
+          } else {
+            // Orden correcto
+            timestamp = col1;
+            chapa = col2;
+            texto = col3;
+          }
 
           if (timestamp && chapa && texto) {
             let parsedDate = new Date(timestamp);
@@ -821,9 +863,9 @@ const SheetsAPI = {
         },
         body: JSON.stringify({
           action: 'addMessage',
+          timestamp: new Date().toISOString(),
           chapa: chapa,
-          texto: texto,
-          timestamp: new Date().toISOString()
+          texto: texto
         })
       });
 
@@ -1181,7 +1223,8 @@ const SheetsAPI = {
    */
   async getMapeoPuestos() {
     try {
-      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_MAPEO_PUESTOS);
+      // IMPORTANTE: No usar caché para mapeo de puestos (siempre datos frescos)
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_MAPEO_PUESTOS, false);
 
       console.log('📋 Datos raw de mapeo_puestos:', data.slice(0, 3)); // Primeros 3 registros
 
@@ -1219,7 +1262,8 @@ const SheetsAPI = {
    */
   async getTablaSalarial() {
     try {
-      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_TABLA_SALARIOS);
+      // IMPORTANTE: No usar caché para tabla salarial (siempre datos frescos)
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_TABLA_SALARIOS, false);
 
       console.log('📋 Datos raw de tabla_salarios:', data.slice(0, 3)); // Primeros 3 registros
 
@@ -1240,7 +1284,30 @@ const SheetsAPI = {
         coef_prima_mayor120: parseEuropeanFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120)
       })).filter(item => item.clave_jornada);
 
-      console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros`);
+      // WORKAROUND FORZADO: Añadir claves de sábado manualmente SIEMPRE
+      const clavesNecesarias = [
+        { clave_jornada: '08-14_SABADO', jornal_base_g1: 145.42, jornal_base_g2: 150.62, prima_minima_coches: 60.31, coef_prima_menor120: 0.374, coef_prima_mayor120: 0.612 },
+        { clave_jornada: '14-20_SABADO', jornal_base_g1: 206.37, jornal_base_g2: 210.95, prima_minima_coches: 78.16, coef_prima_menor120: 0.674, coef_prima_mayor120: 0.786 },
+        { clave_jornada: '20-02_SABADO', jornal_base_g1: 299.3, jornal_base_g2: 303.88, prima_minima_coches: 78.16, coef_prima_menor120: 0.974, coef_prima_mayor120: 1.045 }
+      ];
+
+      console.warn('🔧 APLICANDO WORKAROUND DE SÁBADOS...');
+
+      clavesNecesarias.forEach(clave => {
+        // Eliminar si existe para reemplazar
+        const index = tablaSalarial.findIndex(t => t.clave_jornada === clave.clave_jornada);
+        if (index !== -1) {
+          tablaSalarial.splice(index, 1);
+          console.warn(`🔄 Reemplazando clave: ${clave.clave_jornada}`);
+        } else {
+          console.warn(`➕ Añadiendo clave nueva: ${clave.clave_jornada}`);
+        }
+        tablaSalarial.push(clave);
+      });
+
+      console.warn('✅ WORKAROUND APLICADO - Claves de sábado forzadas en memoria');
+
+      console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros (${tablaSalarial.length - data.length} añadidos manualmente)`);
       if (tablaSalarial.length > 0) {
         console.log('📝 Ejemplo de tabla salarial:', tablaSalarial[0]);
       }
@@ -1516,6 +1583,7 @@ function clearSheetsCache() {
 // Exponer API globalmente
 window.SheetsAPI = SheetsAPI;
 window.clearSheetsCache = clearSheetsCache;
+
 
 
 

@@ -276,6 +276,15 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Botón de scroll hacia abajo en el foro
+  const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+  if (scrollToBottomBtn) {
+    scrollToBottomBtn.addEventListener('click', scrollToBottomForo);
+  }
+
+  // Detectar scroll en el contenedor de mensajes del foro
+  initForoScrollDetection();
 }
 
 /**
@@ -758,13 +767,14 @@ function closeSidebar() {
 }
 
 /**
- * Carga la página de contratación
- * LÓGICA ROBUSTA:
- * 1. Lee contrataciones del CSV
- * 2. Guarda en localStorage con timestamp
- * 3. Muestra desde localStorage (persistente hasta medianoche)
- * 4. Jornada 02-08: se muestra hasta medianoche del día siguiente
- * 5. Otras jornadas: se muestran hasta medianoche del día de contratación
+ * Carga la página de contratación - Mi Contratación
+ * LÓGICA SIMPLIFICADA:
+ * 1. Lee DIRECTAMENTE de Jornales_Historico_Acumulado (Google Sheets)
+ * 2. Filtra jornales para HOY, MAÑANA y PASADO MAÑANA
+ * 3. Ordena por fecha ascendente (hoy → mañana → pasado mañana)
+ * 4. Dentro del mismo día, ordena por jornada cronológica (02-08, 08-14, 14-20, 20-02)
+ * 5. Muestra los jornales durante todo el día hasta medianoche
+ * 6. NO usa caché - siempre datos frescos de Sheets
  */
 async function loadContratacion() {
   const container = document.getElementById('contratacion-content');
@@ -780,6 +790,8 @@ async function loadContratacion() {
     const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
+    const pasadoManana = new Date(hoy);
+    pasadoManana.setDate(pasadoManana.getDate() + 2);
 
     const formatFecha = (fecha) => {
       const dd = String(fecha.getDate()).padStart(2, '0');
@@ -790,58 +802,13 @@ async function loadContratacion() {
 
     const fechaHoy = formatFecha(hoy);
     const fechaManana = formatFecha(manana);
+    const fechaPasadoManana = formatFecha(pasadoManana);
 
-    console.log('=== CONTRATACIONES - MODO ROBUSTO ===');
+    console.log('=== CONTRATACIONES - LECTURA DIRECTA DE SHEETS ===');
     console.log('Fecha hoy:', fechaHoy);
+    console.log('Fecha mañana:', fechaManana);
+    console.log('Fecha pasado mañana:', fechaPasadoManana);
     console.log('Hora actual:', ahora.toTimeString().substring(0, 5));
-
-    // 1. INTENTAR LEER DEL CSV Y ACTUALIZAR LOCALSTORAGE
-    let contratacionesActualizadas = false;
-    try {
-      const allData = await SheetsAPI.getContrataciones(AppState.currentUser);
-      console.log(`📥 CSV: ${allData.length} contrataciones obtenidas`);
-
-      if (allData.length > 0) {
-        // Obtener caché actual
-        let cacheContrataciones = JSON.parse(localStorage.getItem('contrataciones_cache') || '{}');
-        const userKey = AppState.currentUser;
-
-        // Inicializar si no existe
-        if (!cacheContrataciones[userKey]) {
-          cacheContrataciones[userKey] = [];
-        }
-
-        // Agregar nuevas contrataciones al caché (evitar duplicados)
-        allData.forEach(nueva => {
-          const existe = cacheContrataciones[userKey].some(c =>
-            c.fecha === nueva.fecha &&
-            c.jornada === nueva.jornada &&
-            c.puesto === nueva.puesto
-          );
-          if (!existe) {
-            cacheContrataciones[userKey].push({
-              ...nueva,
-              timestamp_guardado: new Date().toISOString()
-            });
-            console.log(`✅ Nueva contratación guardada: ${nueva.jornada} - ${nueva.fecha}`);
-          }
-        });
-
-        // Guardar caché actualizado
-        localStorage.setItem('contrataciones_cache', JSON.stringify(cacheContrataciones));
-        contratacionesActualizadas = true;
-        console.log(`💾 Caché actualizado: ${cacheContrataciones[userKey].length} total`);
-      }
-    } catch (error) {
-      console.warn('⚠️ No se pudo leer del CSV:', error.message);
-    }
-
-    // 2. LEER DESDE LOCALSTORAGE (FUENTE PRINCIPAL DE VISUALIZACIÓN)
-    const cacheContrataciones = JSON.parse(localStorage.getItem('contrataciones_cache') || '{}');
-    const userKey = AppState.currentUser;
-    const allCachedData = cacheContrataciones[userKey] || [];
-
-    console.log(`📂 localStorage: ${allCachedData.length} contrataciones en caché`);
 
     // Normalizar formato de jornada
     const normalizeJornada = (jornada) => {
@@ -852,147 +819,42 @@ async function loadContratacion() {
       return norm;
     };
 
-    // 3. FILTRAR CONTRATACIONES VÁLIDAS (según horario de medianoche)
-    let data = allCachedData.filter(item => {
-      const jornadaNorm = normalizeJornada(item.jornada);
+    // LEER DIRECTAMENTE DE JORNALES_HISTORICO_ACUMULADO
+    console.log('📥 Leyendo jornales desde Jornales_Historico_Acumulado...');
+    const jornalesHistorico = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
+    console.log(`✅ ${jornalesHistorico.length} jornales obtenidos de Sheets`);
 
-      // Jornada 02-08 con fecha de mañana: mostrar hasta medianoche de mañana
-      if (jornadaNorm === '02-08' && item.fecha === fechaManana) {
-        return true;
-      }
-
-      // Cualquier jornada con fecha de hoy: mostrar hasta medianoche de hoy
-      if (item.fecha === fechaHoy) {
-        return true;
-      }
-
-      return false;
+    // Filtrar jornales de HOY, MAÑANA y PASADO MAÑANA
+    const data = jornalesHistorico.filter(jornal => {
+      return jornal.fecha === fechaHoy ||
+             jornal.fecha === fechaManana ||
+             jornal.fecha === fechaPasadoManana;
     });
 
-    console.log(`📊 localStorage: ${data.length} contrataciones válidas para hoy`);
+    console.log(`📊 ${data.length} jornales filtrados para los próximos 3 días`);
 
-    // 3.1 FALLBACK: Si no hay datos en localStorage, buscar en Jornales_Historico_Acumulado
-    if (data.length === 0) {
-      console.log('🔍 No hay datos en localStorage, buscando en Sheets (Jornales_Historico_Acumulado)...');
-      try {
-        const jornalesHistorico = await SheetsAPI.getJornalesHistoricoAcumulado(AppState.currentUser);
-        console.log(`📥 Sheets: ${jornalesHistorico.length} jornales obtenidos del histórico`);
-
-        // Filtrar solo jornales de HOY
-        const jornalesHoy = jornalesHistorico.filter(jornal => {
-          if (jornal.fecha === fechaHoy) {
-            return true;
-          }
-          // También incluir 02-08 de mañana
-          const jornadaNorm = normalizeJornada(jornal.jornada);
-          if (jornadaNorm === '02-08' && jornal.fecha === fechaManana) {
-            return true;
-          }
-          return false;
-        });
-
-        if (jornalesHoy.length > 0) {
-          console.log(`✅ Sheets: ${jornalesHoy.length} jornales de hoy encontrados`);
-
-          // Convertir formato de Sheets a formato de contratación
-          data = jornalesHoy.map(jornal => ({
-            chapa: jornal.chapa,
-            fecha: jornal.fecha,
-            jornada: jornal.jornada,
-            puesto: jornal.puesto,
-            empresa: jornal.empresa || '',
-            buque: jornal.buque || '',
-            parte: jornal.parte || '',
-            logo_url: jornal.logo_url || '',
-            timestamp_guardado: new Date().toISOString()
-          }));
-
-          // Guardar en localStorage para próximas cargas
-          if (!cacheContrataciones[userKey]) {
-            cacheContrataciones[userKey] = [];
-          }
-          data.forEach(nueva => {
-            const existe = cacheContrataciones[userKey].some(c =>
-              c.fecha === nueva.fecha &&
-              c.jornada === nueva.jornada &&
-              c.puesto === nueva.puesto
-            );
-            if (!existe) {
-              cacheContrataciones[userKey].push(nueva);
-            }
-          });
-          localStorage.setItem('contrataciones_cache', JSON.stringify(cacheContrataciones));
-          console.log('💾 Datos de Sheets guardados en localStorage');
-        } else {
-          console.log('ℹ️ No hay jornales de hoy en Sheets');
-        }
-      } catch (error) {
-        console.error('❌ Error al buscar en Sheets:', error);
-      }
-    }
-
-    console.log(`📊 Mostrando: ${data.length} contrataciones válidas`);
-
-    // 4. LIMPIAR CONTRATACIONES ANTIGUAS DEL CACHÉ (después de medianoche)
-    const dataLimpia = allCachedData.filter(item => {
-      const jornadaNorm = normalizeJornada(item.jornada);
-
-      // Mantener 02-08 de mañana
-      if (jornadaNorm === '02-08' && item.fecha === fechaManana) return true;
-
-      // Mantener contrataciones de hoy
-      if (item.fecha === fechaHoy) return true;
-
-      // Eliminar contrataciones antiguas
-      return false;
-    });
-
-    if (dataLimpia.length !== allCachedData.length) {
-      cacheContrataciones[userKey] = dataLimpia;
-      localStorage.setItem('contrataciones_cache', JSON.stringify(cacheContrataciones));
-      console.log(`🗑️ Limpieza: ${allCachedData.length - dataLimpia.length} contrataciones antiguas eliminadas`);
-    }
-
-    // 5. GUARDAR EN HISTÓRICO DE JORNALES (para "Mis Jornales")
-    if (data.length > 0) {
-      const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
-
-      data.forEach(nueva => {
-        const existe = historico.some(h =>
-          h.fecha === nueva.fecha &&
-          h.jornada === nueva.jornada &&
-          h.puesto === nueva.puesto &&
-          h.chapa === nueva.chapa
-        );
-        if (!existe) {
-          historico.push(nueva);
-        }
-      });
-
-      localStorage.setItem('jornales_historico', JSON.stringify(historico));
-      console.log(`💾 Histórico actualizado: ${historico.length} jornales totales`);
-
-      // Sincronizar con Google Sheets (background)
-      try {
-        await SheetsAPI.sincronizarJornalesBackup(AppState.currentUser, historico.filter(h => h.chapa === AppState.currentUser));
-        console.log('✅ Sincronizado con Google Sheets');
-      } catch (syncError) {
-        console.warn('⚠️ Sincronización fallida:', syncError);
-      }
-    }
-
-    // 6. ORDENAR Y MOSTRAR
-    // Ordenar por fecha y jornada
+    // ORDENAR por fecha ascendente y jornada cronológica
     const sortedData = data.sort((a, b) => {
-      // Primero por fecha descendente
+      // Primero por fecha ascendente (más antiguo primero: hoy, mañana, pasado mañana)
       const dateA = new Date(a.fecha.split('/').reverse().join('-'));
       const dateB = new Date(b.fecha.split('/').reverse().join('-'));
-      if (dateB.getTime() !== dateA.getTime()) {
-        return dateB - dateA;
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
       }
-      // Luego por jornada
-      const jornadaOrder = { '02-08': 1, '08-14': 2, '14-20': 3, '20-02': 4 };
-      return (jornadaOrder[a.jornada] || 99) - (jornadaOrder[b.jornada] || 99);
+
+      // Para el mismo día: ordenar por hora de inicio de jornada (cronológicamente)
+      const jornadaNormA = normalizeJornada(a.jornada);
+      const jornadaNormB = normalizeJornada(b.jornada);
+
+      // Orden cronológico por hora de inicio: 02-08, 08-14, 14-20, 20-02
+      const jornadaOrder = {
+        '02-08': 1,
+        '08-14': 2,
+        '14-20': 3,
+        '20-02': 4
+      };
+
+      return (jornadaOrder[jornadaNormA] || 99) - (jornadaOrder[jornadaNormB] || 99);
     });
 
     loading.classList.add('hidden');
@@ -2109,7 +1971,13 @@ function renderForoMessages(messages) {
   // Usar requestAnimationFrame para asegurar que el DOM esté renderizado
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
+      // Hacer scroll al último mensaje para asegurar que se vea completamente
+      const lastMessage = container.lastElementChild;
+      if (lastMessage) {
+        lastMessage.scrollIntoView({ behavior: 'auto', block: 'end' });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
     });
   });
 }
@@ -2152,14 +2020,34 @@ async function sendForoMessage() {
     texto: texto
   };
 
-  // Intentar enviar a Google Apps Script
+  // Añadir mensaje inmediatamente a la vista (optimistic update)
+  const messages = getForoMessagesLocal();
+  messages.push(newMessage);
+  localStorage.setItem('foro_messages', JSON.stringify(messages));
+  renderForoMessages(messages);
+
+  // Limpiar input inmediatamente
+  input.value = '';
+
+  // Scroll al final
+  const container = document.getElementById('foro-messages');
+  if (container) {
+    const lastMessage = container.lastElementChild;
+    if (lastMessage) {
+      lastMessage.scrollIntoView({ behavior: 'auto', block: 'end' });
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  // Enviar a Google Apps Script en segundo plano
   try {
     const sentToCloud = await SheetsAPI.enviarMensajeForo(AppState.currentUser, texto);
 
     if (sentToCloud) {
-      console.log('Mensaje enviado a Google Sheets');
+      console.log('✅ Mensaje enviado a Google Sheets');
 
-      // Mostrar mensaje de éxito
+      // Mostrar feedback visual breve de éxito
       sendBtn.innerHTML = `
         <svg style="width: 20px; height: 20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -2167,65 +2055,74 @@ async function sendForoMessage() {
         <span style="margin-left: 8px;">Enviado</span>
       `;
 
-      // Limpiar input
-      input.value = '';
-
-      // Esperar un poco y recargar para mostrar el mensaje
-      setTimeout(async () => {
-        await loadForo();
-        const container = document.getElementById('foro-messages');
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        }
-
-        // Restaurar botón
+      setTimeout(() => {
         sendBtn.innerHTML = originalBtnHTML;
         input.disabled = false;
         sendBtn.disabled = false;
         input.focus();
-      }, 1000);
+      }, 800);
     } else {
-      // Fallback a localStorage
-      console.log('Usando localStorage para mensajes');
-      const messages = getForoMessagesLocal();
-      messages.push(newMessage);
-      localStorage.setItem('foro_messages', JSON.stringify(messages));
-      renderForoMessages(messages);
-
-      // Scroll al final
-      const container = document.getElementById('foro-messages');
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-
-      // Limpiar y restaurar
-      input.value = '';
+      console.log('⚠️ No se pudo enviar al servidor, guardado localmente');
+      // Restaurar botón
       sendBtn.innerHTML = originalBtnHTML;
       input.disabled = false;
       sendBtn.disabled = false;
       input.focus();
     }
   } catch (error) {
-    console.error('Error enviando mensaje:', error);
-    // Fallback a localStorage
-    const messages = getForoMessagesLocal();
-    messages.push(newMessage);
-    localStorage.setItem('foro_messages', JSON.stringify(messages));
-    renderForoMessages(messages);
-
-    // Scroll al final
-    const container = document.getElementById('foro-messages');
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // Limpiar y restaurar
-    input.value = '';
+    console.error('❌ Error enviando mensaje al servidor:', error);
+    // El mensaje ya está visible localmente, solo restauramos el botón
     sendBtn.innerHTML = originalBtnHTML;
     input.disabled = false;
     sendBtn.disabled = false;
     input.focus();
   }
+}
+
+/**
+ * Scroll suave hacia el final del foro
+ */
+function scrollToBottomForo() {
+  const container = document.getElementById('foro-messages');
+  if (container) {
+    // Hacer scroll al último mensaje para asegurar que se vea completamente
+    const lastMessage = container.lastElementChild;
+    if (lastMessage) {
+      lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    } else {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }
+}
+
+/**
+ * Inicializa la detección de scroll en el foro
+ */
+function initForoScrollDetection() {
+  const container = document.getElementById('foro-messages');
+  const scrollBtn = document.getElementById('scroll-to-bottom-btn');
+
+  if (!container || !scrollBtn) return;
+
+  // Función para verificar la posición del scroll
+  const checkScrollPosition = () => {
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+    if (isNearBottom) {
+      scrollBtn.style.display = 'none';
+    } else {
+      scrollBtn.style.display = 'flex';
+    }
+  };
+
+  // Agregar event listener al scroll del container
+  container.addEventListener('scroll', checkScrollPosition);
+
+  // Verificar posición inicial
+  checkScrollPosition();
 }
 
 // Agregar estilo de animación spin si no existe
@@ -2387,28 +2284,35 @@ function determinarTipoDia(fecha, jornada) {
     diaSiguiente.setDate(diaSiguiente.getDate() + 1);
     const esFestivoManana = esFestivoFecha(diaSiguiente);
 
+    // Para 02-08 también necesitamos revisar el día anterior
+    const diaAnterior = new Date(dateObj);
+    diaAnterior.setDate(diaAnterior.getDate() - 1);
+    const esFestivoAyer = esFestivoFecha(diaAnterior);
+
     if (jornada === '02-08') {
-      // EXCEPCIÓN: Sábado siempre es LABORABLE en jornada 02-08
+      // Jornada 02-08: empieza de noche (02:00) y termina por la mañana (08:00)
+      // IMPORTANTE: Sábado siempre se considera LABORABLE en jornada 02-08
       if (dayOfWeek === 6) {
         return 'LABORABLE';
-      }
-
-      // Jornada 02-08: empieza de noche y termina por la mañana
-      if (esFestivoHoy && !esFestivoManana) {
+      } else if (esFestivoHoy && !esFestivoManana) {
         return 'FEST-LAB';
       } else if (esFestivoManana) {
         return 'FESTIVO';
+      } else if (esFestivoAyer && !esFestivoHoy) {
+        // Si ayer fue festivo y hoy no → FEST-LAB (ej: domingo festivo → lunes 02-08)
+        return 'FEST-LAB';
       } else {
         return 'LABORABLE';
       }
     } else if (jornada === '20-02') {
       // Jornada 20-02: empieza de tarde y termina de madrugada
-      if (!esFestivoHoy && esFestivoManana) {
+      // IMPORTANTE: Sábado tiene prioridad sobre LAB-FEST (sábado a domingo)
+      if (dayOfWeek === 6) {
+        return 'SABADO';
+      } else if (!esFestivoHoy && esFestivoManana) {
         return 'LAB-FEST';
       } else if (esFestivoHoy) {
         return 'FESTIVO';
-      } else if (dayOfWeek === 6) {
-        return 'SABADO';
       } else {
         return 'LABORABLE';
       }
@@ -2587,11 +2491,10 @@ async function loadSueldometro() {
       const salarioInfo = tablaSalarial.find(s => s.clave_jornada === claveJornada);
 
       if (!salarioInfo) {
-        console.warn(`⚠️ Clave de jornada no encontrada: "${claveJornada}"`);
-        if (index === 0) {
-          console.log('Claves disponibles en tabla salarial:', tablaSalarial.map(t => t.clave_jornada));
-        }
-        return { ...jornal, salario_base: 0, prima: 0, total: 0, error: 'Jornada no encontrada' };
+        console.error(`❌ Clave de jornada NO encontrada: "${claveJornada}"`);
+        console.log('📋 Claves disponibles:', tablaSalarial.map(t => `"${t.clave_jornada}"`).join(', '));
+        console.log('🔍 Buscando:', `"${claveJornada}" (Fecha: ${jornal.fecha}, Jornada: ${jornada}, Tipo día: ${tipoDia})`);
+        return { ...jornal, salario_base: 0, prima: 0, total: 0, error: `Jornada no encontrada: ${claveJornada}` };
       }
 
       // Debug del primer jornal
@@ -2761,8 +2664,10 @@ async function loadSueldometro() {
       // No hay relevo en 02-08
       if (jornada === '02-08') return null;
 
-      // Tarifa especial para sábados 20-02 (20-21 sábado a 02-03 lunes)
-      if (jornada === '20-02' && tipoDia === 'SABADO') {
+      // Tarifa especial 93,55€ para:
+      // - Festivos y domingos (cualquier tipo de día que incluya FEST)
+      // - Sábados desde 14-20 hasta 20-02
+      if (tipoDia.includes('FEST') || (tipoDia === 'SABADO' && (jornada === '14-20' || jornada === '20-02'))) {
         return 93.55;
       }
 
@@ -2775,9 +2680,8 @@ async function loadSueldometro() {
       const tarifasRemate = {
         '02-08': {
           'LABORABLE': 61.40,
-          'FEST. A LAB.': 70.36,
-          'FESTIVO': 110.57,
-          'FEST. A FEST.': 120.53
+          'FEST-LAB': 70.36,
+          'FESTIVO': 110.57
         },
         '06-12': {
           'LABORABLE': 41.13,
@@ -2795,10 +2699,9 @@ async function loadSueldometro() {
         },
         '20-02': {
           'LABORABLE': 43.51,
-          'LAB A FEST': 99.25,
+          'LAB-FEST': 99.25,
           'SABADO': 76.85,
-          'FEST. A LAB.': 88.20,
-          'FEST. A FEST.': 99.60
+          'FEST-LAB': 88.20
         }
       };
 
