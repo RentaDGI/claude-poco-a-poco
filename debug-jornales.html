@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Jornales Manuales</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #0066cc;
+      padding-bottom: 10px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #0066cc;
+      border-radius: 4px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #0066cc;
+    }
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f8;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+    .success { color: #28a745; font-weight: bold; }
+    .error { color: #dc3545; font-weight: bold; }
+    .warning { color: #ffc107; font-weight: bold; }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    .btn-danger {
+      background: #dc3545;
+    }
+    .btn-danger:hover {
+      background: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Diagnóstico de Jornales Manuales</h1>
+
+    <div class="section">
+      <h2>1️⃣ Verificar localStorage</h2>
+      <button onclick="checkLocalStorage()">Verificar Jornales en localStorage</button>
+      <div id="localStorage-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>2️⃣ Verificar Función de Editar</h2>
+      <button onclick="checkEditFunction()">Verificar Función abrirModalEditarJornal</button>
+      <div id="function-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>3️⃣ Probar Abrir Modal</h2>
+      <button onclick="testModal()">Probar Modal de Edición</button>
+      <div id="modal-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>4️⃣ Limpiar Caché y Recargar</h2>
+      <button class="btn-danger" onclick="clearCache()">🗑️ Limpiar Todo y Recargar</button>
+      <p><small>⚠️ Esto eliminará todos los datos locales</small></p>
+    </div>
+  </div>
+
+  <script>
+    function checkLocalStorage() {
+      const result = document.getElementById('localStorage-result');
+      try {
+        const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+        const manuales = historico.filter(j => j.manual === true);
+
+        let html = '<pre>';
+        html += `<span class="success">✅ localStorage OK</span>\n\n`;
+        html += `Total jornales: ${historico.length}\n`;
+        html += `Jornales manuales: ${manuales.length}\n\n`;
+
+        if (manuales.length > 0) {
+          html += `<span class="success">✅ HAY jornales manuales</span>\n\n`;
+          html += `Últimos 3 jornales manuales:\n`;
+          manuales.slice(-3).forEach((j, i) => {
+            html += `\n${i + 1}. Fecha: ${j.fecha}\n`;
+            html += `   Jornada: ${j.jornada}\n`;
+            html += `   Puesto: ${j.puesto}\n`;
+            html += `   Empresa: ${j.empresa}\n`;
+            html += `   Manual: ${j.manual}\n`;
+          });
+        } else {
+          html += `<span class="error">❌ NO hay jornales manuales</span>\n`;
+          html += `Intenta añadir uno desde la app principal\n`;
+        }
+
+        html += '</pre>';
+        result.innerHTML = html;
+      } catch (error) {
+        result.innerHTML = `<pre><span class="error">❌ Error: ${error.message}</span></pre>`;
+      }
+    }
+
+    function checkEditFunction() {
+      const result = document.getElementById('function-result');
+      let html = '<pre>';
+
+      // Verificar si la función existe
+      if (typeof window.abrirModalEditarJornal === 'function') {
+        html += `<span class="success">✅ Función abrirModalEditarJornal existe</span>\n`;
+      } else {
+        html += `<span class="error">❌ Función abrirModalEditarJornal NO existe</span>\n`;
+        html += `<span class="warning">⚠️ Necesitas cargar app.js primero</span>\n`;
+      }
+
+      // Verificar modal
+      const modal = document.getElementById('add-jornal-modal');
+      if (modal) {
+        html += `<span class="success">✅ Modal existe en el DOM</span>\n`;
+      } else {
+        html += `<span class="error">❌ Modal NO existe en el DOM</span>\n`;
+        html += `<span class="warning">⚠️ Necesitas estar en la página principal</span>\n`;
+      }
+
+      html += '</pre>';
+      result.innerHTML = html;
+    }
+
+    function testModal() {
+      const result = document.getElementById('modal-result');
+
+      if (typeof window.abrirModalEditarJornal !== 'function') {
+        result.innerHTML = '<pre><span class="error">❌ No puedes probar desde aquí</span>\n' +
+                          '<span class="warning">Abre la página principal (index.html)</span></pre>';
+        return;
+      }
+
+      const historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+      const manuales = historico.filter(j => j.manual === true);
+
+      if (manuales.length === 0) {
+        result.innerHTML = '<pre><span class="error">❌ No hay jornales manuales para probar</span></pre>';
+        return;
+      }
+
+      const jornal = manuales[0];
+      try {
+        window.abrirModalEditarJornal(jornal);
+        result.innerHTML = '<pre><span class="success">✅ Modal abierto correctamente</span></pre>';
+      } catch (error) {
+        result.innerHTML = `<pre><span class="error">❌ Error: ${error.message}</span></pre>`;
+      }
+    }
+
+    function clearCache() {
+      if (confirm('⚠️ ¿Estás seguro? Esto eliminará TODOS los datos locales')) {
+        localStorage.clear();
+        sessionStorage.clear();
+        alert('✅ Caché limpiada. Recargando...');
+        location.href = '/';
+      }
+    }
+
+    // Auto-ejecutar verificación al cargar
+    window.addEventListener('load', () => {
+      checkLocalStorage();
+    });
+  </script>
+</body>
+</html>
