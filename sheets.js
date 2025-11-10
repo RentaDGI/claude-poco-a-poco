@@ -35,7 +35,7 @@ const SHEETS_CONFIG = {
   URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929',
 
   // URL del Apps Script (Web App deployada) - ACTUALIZADA
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxn3kv_G0-qDjJwUqOdnOIFMN0zjfz12UbvSdei9VYsJ94y2kVccpFO5ZPF2KSpx862lw/exec'
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbx5XNJx1XEk70T7QjAAbLgcXKX6PRMl64SBu63ROzSZTuKdM7r042qn1odiqMdwbf1luQ/exec'
 };
 
 /**
