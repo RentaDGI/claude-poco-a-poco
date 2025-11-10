@@ -1,14 +1,26 @@
 /**
- * APPS SCRIPT PORTAL POCO A POCO - VERSIÓN COMPLETA
+ * APPS SCRIPT PORTAL - VERSIÓN SUPABASE SYNC + EDIT/DELETE
  *
- * Funcionalidades:
- * 1. Gestión de mensajes del foro
- * 2. Cambio de contraseñas
- * 3. Importación CSV automática cada 5 min + pivot a histórico (SIN DUPLICADOS)
- * 4. Gestión de IRPF personalizado
- * 5. Gestión de primas personalizadas (prima, movimientos, relevo, remate)
- * 6. Gestión de jornales manuales (persistencia permanente)
+ * NUEVO: Ahora sincroniza automáticamente con Supabase
+ * - Mantiene Google Sheets como backup
+ * - Escribe jornales en Supabase tabla "jornales"
+ * - PWA lee directamente de Supabase (más rápido)
+ * - Soporta edición y eliminación de jornales manuales
  */
+
+// ============================================================================
+// CONFIGURACIÓN SUPABASE
+// ============================================================================
+const SUPABASE_CONFIG = {
+  URL: 'https://icszzxkdxatfytpmoviq.supabase.co',
+  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc3p6eGtkeGF0Znl0cG1vdmlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2Mzk2NjUsImV4cCI6MjA3ODIxNTY2NX0.hmQWNB3sCyBh39gdNgQLjjlIvliwJje-OYf0kkPObVA',
+  ENDPOINTS: {
+    JORNALES: '/rest/v1/jornales',
+    CONTRATACIONES: '/rest/v1/contrataciones',
+    PRIMAS: '/rest/v1/primas_personalizadas',
+    CONFIG_USUARIO: '/rest/v1/configuracion_usuario'
+  }
+};
 
 const CONFIG = {
   HOJAS: {
@@ -22,6 +34,294 @@ const CONFIG = {
   },
   CSV_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSTtbkA94xqjf81lsR7bLKKtyES2YBDKs8J2T4UrSEan7e5Z_eaptShCA78R1wqUyYyASJxmHj3gDnY/pub?output=csv&gid=1388412839'
 };
+
+// ============================================================================
+// FUNCIONES AUXILIARES SUPABASE
+// ============================================================================
+
+/**
+ * Envía datos a Supabase usando REST API
+ */
+function enviarASupabase(endpoint, datos, metodo = 'POST') {
+  try {
+    // VALIDAR PARÁMETROS
+    if (!endpoint || endpoint === 'undefined') {
+      const errorMsg = 'Error: endpoint no definido. Debe llamar con SUPABASE_CONFIG.ENDPOINTS.JORNALES';
+      Logger.log(`❌ ${errorMsg}`);
+      return { success: false, error: errorMsg };
+    }
+
+    if (!datos) {
+      const errorMsg = 'Error: datos no definidos';
+      Logger.log(`❌ ${errorMsg}`);
+      return { success: false, error: errorMsg };
+    }
+
+    // Construir URL
+    const url = SUPABASE_CONFIG.URL + endpoint;
+    Logger.log(`🔗 URL: ${url}`);
+
+    const opciones = {
+      method: metodo,
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_CONFIG.ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      payload: JSON.stringify(datos),
+      muteHttpExceptions: true
+    };
+
+    const respuesta = UrlFetchApp.fetch(url, opciones);
+    const codigo = respuesta.getResponseCode();
+
+    if (codigo === 200 || codigo === 201 || codigo === 204) {
+      Logger.log(`✅ Datos enviados a Supabase: ${endpoint}`);
+      return { success: true };
+    } else {
+      Logger.log(`⚠️ Error Supabase (${codigo}): ${respuesta.getContentText()}`);
+      return { success: false, error: respuesta.getContentText() };
+    }
+
+  } catch (error) {
+    Logger.log(`❌ Error al enviar a Supabase: ${error}`);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Elimina un registro de Supabase
+ */
+function eliminarDeSupabase(endpoint, filtros) {
+  try {
+    // Construir query string con filtros
+    const queryParams = Object.entries(filtros)
+      .map(([key, value]) => `${key}=eq.${encodeURIComponent(value)}`)
+      .join('&');
+
+    const url = `${SUPABASE_CONFIG.URL}${endpoint}?${queryParams}`;
+    Logger.log(`🔗 DELETE URL: ${url}`);
+
+    const opciones = {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_CONFIG.ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      muteHttpExceptions: true
+    };
+
+    const respuesta = UrlFetchApp.fetch(url, opciones);
+    const codigo = respuesta.getResponseCode();
+
+    if (codigo === 200 || codigo === 204) {
+      Logger.log(`✅ Registro eliminado de Supabase: ${endpoint}`);
+      return { success: true };
+    } else {
+      Logger.log(`⚠️ Error eliminando de Supabase (${codigo}): ${respuesta.getContentText()}`);
+      return { success: false, error: respuesta.getContentText() };
+    }
+
+  } catch (error) {
+    Logger.log(`❌ Error al eliminar de Supabase: ${error}`);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Actualiza un registro en Supabase
+ */
+function actualizarEnSupabase(endpoint, filtros, datosNuevos) {
+  try {
+    // Construir query string con filtros
+    const queryParams = Object.entries(filtros)
+      .map(([key, value]) => `${key}=eq.${encodeURIComponent(value)}`)
+      .join('&');
+
+    const url = `${SUPABASE_CONFIG.URL}${endpoint}?${queryParams}`;
+    Logger.log(`🔗 PATCH URL: ${url}`);
+
+    const opciones = {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_CONFIG.ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      payload: JSON.stringify(datosNuevos),
+      muteHttpExceptions: true
+    };
+
+    const respuesta = UrlFetchApp.fetch(url, opciones);
+    const codigo = respuesta.getResponseCode();
+
+    if (codigo === 200 || codigo === 204) {
+      Logger.log(`✅ Registro actualizado en Supabase: ${endpoint}`);
+      return { success: true };
+    } else {
+      Logger.log(`⚠️ Error actualizando en Supabase (${codigo}): ${respuesta.getContentText()}`);
+      return { success: false, error: respuesta.getContentText() };
+    }
+
+  } catch (error) {
+    Logger.log(`❌ Error al actualizar en Supabase: ${error}`);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
+ * Valida y convierte una fecha a formato ISO (YYYY-MM-DD)
+ * Retorna null si la fecha es inválida
+ */
+function validarYConvertirFecha(fecha) {
+  if (!fecha) return null;
+
+  // Si es objeto Date
+  if (fecha instanceof Date) {
+    if (isNaN(fecha.getTime())) return null;
+    return Utilities.formatDate(fecha, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+
+  // Si es string
+  const fechaStr = String(fecha).trim().toUpperCase();
+
+  // Rechazar valores no válidos como "FC", "N/A", etc.
+  if (fechaStr.length < 8 || fechaStr === 'FC' || fechaStr === 'N/A' || fechaStr === '--') {
+    return null;
+  }
+
+  // Intentar parsear formato DD/MM/YYYY
+  const partes = fechaStr.split('/');
+  if (partes.length === 3) {
+    const [dia, mes, año] = partes.map(p => parseInt(p, 10));
+
+    // Validar que sean números válidos
+    if (isNaN(dia) || isNaN(mes) || isNaN(año)) return null;
+    if (año < 1900 || año > 2100) return null;
+    if (mes < 1 || mes > 12) return null;
+    if (dia < 1 || dia > 31) return null;
+
+    return `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  }
+
+  // Intentar parsear formato YYYY-MM-DD
+  const partesISO = fechaStr.split('-');
+  if (partesISO.length === 3) {
+    const [año, mes, dia] = partesISO.map(p => parseInt(p, 10));
+
+    if (isNaN(dia) || isNaN(mes) || isNaN(año)) return null;
+    if (año < 1900 || año > 2100) return null;
+    if (mes < 1 || mes > 12) return null;
+    if (dia < 1 || dia > 31) return null;
+
+    return fechaStr;
+  }
+
+  return null;
+}
+
+/**
+ * Envía batch de jornales a Supabase usando UPSERT
+ */
+function enviarJornalesASupabase(jornales) {
+  if (!jornales || jornales.length === 0) {
+    Logger.log('ℹ️ No hay jornales para enviar a Supabase');
+    return { success: true, count: 0 };
+  }
+
+  try {
+    Logger.log(`📊 Encontrados ${jornales.length} jornales históricos`);
+
+    // Convertir y VALIDAR formato: [fecha, chapa, puesto, jornada, empresa, buque, parte, origen]
+    const datosSupabase = [];
+    let descartados = 0;
+
+    for (let i = 0; i < jornales.length; i++) {
+      const jornal = jornales[i];
+      const [fecha, chapa, puesto, jornada, empresa, buque, parte, origen] = jornal;
+
+      // VALIDAR FECHA - Rechazar fechas inválidas como "FC"
+      const fechaISO = validarYConvertirFecha(fecha);
+      if (!fechaISO) {
+        descartados++;
+        if (descartados <= 10) { // Mostrar solo los primeros 10 errores
+          Logger.log(`⚠️ Jornal #${i + 1} descartado: fecha inválida "${fecha}"`);
+        }
+        continue;
+      }
+
+      // VALIDAR CHAPA (requerida)
+      const chapaStr = String(chapa || '').trim();
+      if (!chapaStr) {
+        descartados++;
+        continue;
+      }
+
+      // Truncar valores largos para evitar error VARCHAR
+      const jornadaStr = String(jornada || '').trim().substring(0, 100);
+      const origenStr = String(origen || 'AUTO').trim().substring(0, 50);
+
+      datosSupabase.push({
+        fecha: fechaISO,
+        chapa: chapaStr,
+        puesto: String(puesto || '').trim().substring(0, 50),
+        jornada: jornadaStr,
+        empresa: String(empresa || '').trim().substring(0, 100),
+        buque: String(buque || '--').trim().substring(0, 100),
+        parte: String(parte || '1').trim().substring(0, 50),
+        origen: origenStr
+      });
+    }
+
+    if (descartados > 0) {
+      Logger.log(`⚠️ Total descartados: ${descartados} jornales (fechas inválidas o datos incompletos)`);
+    }
+
+    if (datosSupabase.length === 0) {
+      Logger.log('⚠️ No hay jornales válidos para enviar');
+      return { success: true, count: 0, descartados: descartados };
+    }
+
+    Logger.log(`✅ Preparados ${datosSupabase.length} jornales válidos para Supabase`);
+
+    // Enviar en lotes de 100 (límite de Supabase)
+    const BATCH_SIZE = 100;
+    let totalEnviados = 0;
+    let erroresLote = 0;
+
+    for (let i = 0; i < datosSupabase.length; i += BATCH_SIZE) {
+      const lote = datosSupabase.slice(i, i + BATCH_SIZE);
+      const resultado = enviarASupabase(SUPABASE_CONFIG.ENDPOINTS.JORNALES, lote, 'POST');
+
+      if (resultado.success) {
+        totalEnviados += lote.length;
+      } else {
+        erroresLote++;
+        Logger.log(`⚠️ Error lote (${resultado.error ? JSON.parse(resultado.error).code : 'desconocido'}): ${resultado.error}`);
+      }
+
+      // Evitar rate limiting
+      Utilities.sleep(500);
+    }
+
+    Logger.log(`✅ Enviados ${totalEnviados}/${jornales.length} a Supabase`);
+    Logger.log(`✅ Sincronización completada: ${totalEnviados}/${jornales.length}`);
+
+    return {
+      success: true,
+      count: totalEnviados,
+      descartados: descartados,
+      erroresLote: erroresLote
+    };
+
+  } catch (error) {
+    Logger.log(`❌ Error en enviarJornalesASupabase: ${error}`);
+    return { success: false, error: error.toString() };
+  }
+}
 
 // ============================================================================
 // ENDPOINT PRINCIPAL
@@ -67,9 +367,9 @@ function doPost(e) {
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    message: 'Apps Script funcionando correctamente',
+    message: 'Apps Script funcionando con Supabase Sync + Edit/Delete',
     timestamp: new Date().toISOString(),
-    version: '3.0-completo'
+    version: '4.1-supabase-sync-edit-delete'
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -230,7 +530,7 @@ function getUserConfig(params) {
 }
 
 // ============================================================================
-// 4. PRIMAS PERSONALIZADAS (Prima, Movimientos, Relevo, Remate)
+// 4. PRIMAS PERSONALIZADAS
 // ============================================================================
 function savePrimaPersonalizada(params) {
   try {
@@ -326,12 +626,8 @@ function getPrimasPersonalizadas(params) {
 }
 
 // ============================================================================
-// 5. JORNALES MANUALES - GUARDAR EN JORNALES_HISTORICO_ACUMULADO
+// 5. JORNALES MANUALES - GUARDAR EN SHEETS + SUPABASE
 // ============================================================================
-/**
- * Guarda jornal manual directamente en Jornales_Historico_Acumulado
- * De esta forma se lee automáticamente via CSV público sin problemas de CORS
- */
 function saveJornalManual(params) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -356,7 +652,6 @@ function saveJornalManual(params) {
     }
 
     // Verificar si ya existe (evitar duplicados)
-    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] == fecha && data[i][1] == chapa && data[i][2] == puesto && data[i][3] == jornada) {
@@ -365,10 +660,19 @@ function saveJornalManual(params) {
       }
     }
 
-    // Añadir nueva fila DIRECTAMENTE a histórico
-    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
+    // Añadir nueva fila a Sheets
     sheet.appendRow([fecha, chapa, puesto, jornada, empresa, buque, parte, 'MANUAL']);
-    Logger.log(`✅ Jornal manual guardado en histórico: ${chapa} ${fecha} ${jornada} ${puesto}`);
+    Logger.log(`✅ Jornal manual guardado en Sheets: ${chapa} ${fecha} ${jornada} ${puesto}`);
+
+    // NUEVO: Enviar a Supabase
+    const jornalData = [[fecha, chapa, puesto, jornada, empresa, buque, parte, 'MANUAL']];
+    const resultadoSupabase = enviarJornalesASupabase(jornalData);
+
+    if (resultadoSupabase.success) {
+      Logger.log(`✅ Jornal manual también guardado en Supabase`);
+    } else {
+      Logger.log(`⚠️ Error guardando en Supabase: ${resultadoSupabase.error}`);
+    }
 
     return jsonResponse(true, null, 'Jornal guardado correctamente');
 
@@ -379,16 +683,7 @@ function saveJornalManual(params) {
 }
 
 /**
- * Ya no usamos esta función - los jornales manuales se leen desde CSV público
- * La dejamos para compatibilidad pero devuelve vacío
- */
-function getJornalesManuales(params) {
-  Logger.log('ℹ️ getJornalesManuales: Los jornales manuales ahora se leen desde Jornales_Historico_Acumulado via CSV');
-  return jsonResponse(true, [], 'Los jornales manuales se leen desde CSV público');
-}
-
-/**
- * Elimina un jornal manual del histórico acumulado
+ * NUEVO: Elimina un jornal manual del histórico acumulado (Sheets + Supabase)
  */
 function deleteJornalManual(params) {
   try {
@@ -409,26 +704,46 @@ function deleteJornalManual(params) {
       throw new Error('Faltan parámetros requeridos para eliminar');
     }
 
-    // Buscar y eliminar la fila
-    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
+    // Buscar y eliminar la fila en Sheets
     const data = sheet.getDataRange().getValues();
     let filaEliminada = false;
 
-    for (let i = data.length - 1; i >= 1; i--) { // Empezar desde el final para evitar problemas al eliminar
+    for (let i = data.length - 1; i >= 1; i--) {
       if (data[i][0] == fecha &&
           data[i][1] == chapa &&
           data[i][2] == puesto &&
           data[i][3] == jornada &&
-          data[i][7] == 'MANUAL') { // Solo eliminar si es MANUAL
+          data[i][7] == 'MANUAL') {
         sheet.deleteRow(i + 1);
         filaEliminada = true;
-        Logger.log(`✅ Jornal manual eliminado: ${chapa} ${fecha} ${jornada} ${puesto}`);
-        break; // Solo eliminar la primera coincidencia
+        Logger.log(`✅ Jornal manual eliminado de Sheets: ${chapa} ${fecha} ${jornada} ${puesto}`);
+        break;
       }
     }
 
     if (!filaEliminada) {
       return jsonResponse(false, null, 'No se encontró el jornal para eliminar');
+    }
+
+    // NUEVO: Eliminar de Supabase
+    const fechaISO = validarYConvertirFecha(fecha);
+    if (fechaISO) {
+      const resultadoSupabase = eliminarDeSupabase(
+        SUPABASE_CONFIG.ENDPOINTS.JORNALES,
+        {
+          fecha: fechaISO,
+          chapa: chapa,
+          puesto: puesto,
+          jornada: jornada,
+          origen: 'MANUAL'
+        }
+      );
+
+      if (resultadoSupabase.success) {
+        Logger.log(`✅ Jornal manual también eliminado de Supabase`);
+      } else {
+        Logger.log(`⚠️ Error eliminando de Supabase: ${resultadoSupabase.error}`);
+      }
     }
 
     return jsonResponse(true, null, 'Jornal eliminado correctamente');
@@ -440,7 +755,7 @@ function deleteJornalManual(params) {
 }
 
 /**
- * Actualiza un jornal manual en el histórico acumulado
+ * NUEVO: Actualiza un jornal manual en el histórico acumulado (Sheets + Supabase)
  */
 function updateJornalManual(params) {
   try {
@@ -476,7 +791,7 @@ function updateJornalManual(params) {
       throw new Error('Faltan parámetros nuevos requeridos');
     }
 
-    // Buscar y actualizar la fila
+    // Buscar y actualizar la fila en Sheets
     const data = sheet.getDataRange().getValues();
     let filaActualizada = false;
 
@@ -485,18 +800,49 @@ function updateJornalManual(params) {
           data[i][1] == chapaOriginal &&
           data[i][2] == puestoOriginal &&
           data[i][3] == jornadaOriginal &&
-          data[i][7] == 'MANUAL') { // Solo actualizar si es MANUAL
+          data[i][7] == 'MANUAL') {
 
-        // Actualizar los valores
         sheet.getRange(i + 1, 1, 1, 7).setValues([[fecha, chapa, puesto, jornada, empresa, buque, parte]]);
         filaActualizada = true;
-        Logger.log(`✅ Jornal manual actualizado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+        Logger.log(`✅ Jornal manual actualizado en Sheets: ${chapa} ${fecha} ${jornada} ${puesto}`);
         break;
       }
     }
 
     if (!filaActualizada) {
       return jsonResponse(false, null, 'No se encontró el jornal para actualizar');
+    }
+
+    // NUEVO: Actualizar en Supabase
+    const fechaOriginalISO = validarYConvertirFecha(fechaOriginal);
+    const fechaNuevaISO = validarYConvertirFecha(fecha);
+
+    if (fechaOriginalISO && fechaNuevaISO) {
+      const resultadoSupabase = actualizarEnSupabase(
+        SUPABASE_CONFIG.ENDPOINTS.JORNALES,
+        {
+          fecha: fechaOriginalISO,
+          chapa: chapaOriginal,
+          puesto: puestoOriginal,
+          jornada: jornadaOriginal,
+          origen: 'MANUAL'
+        },
+        {
+          fecha: fechaNuevaISO,
+          chapa: chapa,
+          puesto: puesto,
+          jornada: jornada,
+          empresa: empresa,
+          buque: buque,
+          parte: parte
+        }
+      );
+
+      if (resultadoSupabase.success) {
+        Logger.log(`✅ Jornal manual también actualizado en Supabase`);
+      } else {
+        Logger.log(`⚠️ Error actualizando en Supabase: ${resultadoSupabase.error}`);
+      }
     }
 
     return jsonResponse(true, null, 'Jornal actualizado correctamente');
@@ -507,13 +853,18 @@ function updateJornalManual(params) {
   }
 }
 
+function getJornalesManuales(params) {
+  Logger.log('ℹ️ getJornalesManuales: Los jornales manuales ahora se leen desde Supabase');
+  return jsonResponse(true, [], 'Los jornales manuales se leen desde Supabase');
+}
+
 // ============================================================================
-// 6. IMPORTACIÓN CSV AUTOMÁTICA (CADA 5 MIN) + PIVOT A HISTÓRICO
+// 6. IMPORTACIÓN CSV AUTOMÁTICA + SINCRONIZACIÓN SUPABASE
 // ============================================================================
 
 /**
  * Función automática que se ejecuta cada 5 minutos
- * Importa CSV y luego pivotea a histórico SIN DUPLICADOS
+ * AHORA TAMBIÉN ESCRIBE EN SUPABASE
  */
 function importarCSVAutomatico() {
   try {
@@ -538,15 +889,16 @@ function importarCSVAutomatico() {
     hoja.getRange(1, 1, datos.length, datos[0].length).setValues(datos);
     Logger.log(`✅ CSV importado: ${datos.length} filas`);
 
-    // 2. Pivotar a histórico SIN DUPLICADOS
-    const filasAgregadas = pivotContrataGlideToJornales();
+    // 2. Pivotar a histórico (Sheets) Y Supabase
+    const resultado = pivotContrataGlideToJornales();
 
-    Logger.log(`✅ Proceso completo: ${datos.length} filas CSV, ${filasAgregadas} nuevas en histórico`);
+    Logger.log(`✅ Proceso completo: ${datos.length} filas CSV, ${resultado.sheetsNuevas} en Sheets, ${resultado.supabaseEnviados} en Supabase`);
 
     return {
       success: true,
       csvFilas: datos.length,
-      historicFilasAgregadas: filasAgregadas
+      sheetsNuevas: resultado.sheetsNuevas,
+      supabaseEnviados: resultado.supabaseEnviados
     };
 
   } catch (e) {
@@ -565,7 +917,7 @@ function importarCSVManualmente() {
   const hoja = ss.getSheetByName(CONFIG.HOJAS.CONTRATA_GLIDE);
 
   if (hoja && result.success) {
-    hoja.getRange("A1").setValue(`✅ Importado: ${result.csvFilas} filas CSV, ${result.historicFilasAgregadas} nuevas en histórico`);
+    hoja.getRange("A1").setValue(`✅ Importado: ${result.csvFilas} filas CSV | ${result.sheetsNuevas} nuevas en Sheets | ${result.supabaseEnviados} enviadas a Supabase`);
   } else if (hoja) {
     hoja.getRange("A1").setValue("❌ Error al importar. Ver log.");
   }
@@ -574,9 +926,8 @@ function importarCSVManualmente() {
 }
 
 /**
- * Pivotea de contrata_glide a Jornales_Historico_Acumulado
- * Evita duplicados por clave: Fecha|Chapa|Puesto|Jornada
- * RETORNA número de filas agregadas
+ * Pivotea de contrata_glide a SHEETS + SUPABASE
+ * MODIFICADO para enviar también a Supabase
  */
 function pivotContrataGlideToJornales() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -585,7 +936,7 @@ function pivotContrataGlideToJornales() {
 
   if (!sheetOrigen || !sheetDestino) {
     Logger.log('❌ Hojas no encontradas');
-    return 0;
+    return { sheetsNuevas: 0, supabaseEnviados: 0 };
   }
 
   // Leer existentes
@@ -606,7 +957,7 @@ function pivotContrataGlideToJornales() {
   const lastRowOrigen = sheetOrigen.getLastRow();
   if (lastRowOrigen < 2) {
     Logger.log('ℹ️ No hay datos en contrata_glide');
-    return 0;
+    return { sheetsNuevas: 0, supabaseEnviados: 0 };
   }
 
   // Leer datos origen (A-K = 11 columnas)
@@ -632,16 +983,32 @@ function pivotContrataGlideToJornales() {
     });
   });
 
+  let sheetsNuevas = 0;
+  let supabaseEnviados = 0;
+
   // Escribir nuevas filas
   if (nuevas.length > 0) {
+    // 1. Guardar en Sheets
     const startRow = sheetDestino.getLastRow() + 1;
     sheetDestino.getRange(startRow, 1, nuevas.length, 8).setValues(nuevas);
-    Logger.log(`✅ ${nuevas.length} filas añadidas al histórico`);
+    sheetsNuevas = nuevas.length;
+    Logger.log(`✅ ${nuevas.length} filas añadidas a Sheets`);
+
+    // 2. NUEVO: Enviar a Supabase
+    const resultadoSupabase = enviarJornalesASupabase(nuevas);
+    supabaseEnviados = resultadoSupabase.count || 0;
+
+    if (resultadoSupabase.success) {
+      Logger.log(`✅ ${supabaseEnviados} jornales enviados a Supabase`);
+    } else {
+      Logger.log(`⚠️ Error enviando a Supabase: ${resultadoSupabase.error}`);
+    }
+
   } else {
     Logger.log('ℹ️ No hay filas nuevas');
   }
 
-  return nuevas.length;
+  return { sheetsNuevas, supabaseEnviados };
 }
 
 // ============================================================================
@@ -649,10 +1016,13 @@ function pivotContrataGlideToJornales() {
 // ============================================================================
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('🌀 Importación CSV')
-    .addItem('📥 Actualizar "contrata_glide" AHORA', 'importarCSVManualmente')
+    .createMenu('🌀 Importación CSV + Supabase')
+    .addItem('📥 Actualizar AHORA (CSV → Sheets → Supabase)', 'importarCSVManualmente')
+    .addSeparator()
+    .addItem('🔄 SINCRONIZACIÓN INICIAL (ejecutar UNA vez)', 'sincronizarTodosLosJornalesASupabase')
     .addSeparator()
     .addItem('⚙️ Ver triggers activos', 'verTriggers')
+    .addItem('🧪 Probar conexión Supabase', 'probarConexionSupabase')
     .addToUi();
 }
 
@@ -678,7 +1048,7 @@ function configurarTriggerImportacionCSV() {
     .everyMinutes(5)
     .create();
 
-  Logger.log('✅ Trigger configurado: importarCSVAutomatico cada 5 min');
+  Logger.log('✅ Trigger configurado: importarCSVAutomatico cada 5 min + Supabase sync');
 
   // Ejecutar inmediatamente para probar
   const resultado = importarCSVAutomatico();
@@ -724,4 +1094,119 @@ function verTriggers() {
   }
 
   return info;
+}
+
+/**
+ * Probar conexión con Supabase
+ */
+function probarConexionSupabase() {
+  Logger.log('🧪 Probando conexión con Supabase...');
+
+  const datoPrueba = {
+    fecha: '2025-01-01',
+    chapa: 'TEST',
+    puesto: 'PRUEBA',
+    jornada: 'TEST',
+    empresa: 'TEST',
+    buque: 'TEST',
+    parte: '1',
+    origen: 'TEST'
+  };
+
+  const resultado = enviarASupabase(SUPABASE_CONFIG.ENDPOINTS.JORNALES, [datoPrueba], 'POST');
+
+  const ui = SpreadsheetApp.getUi();
+  if (resultado.success) {
+    Logger.log('✅ Conexión Supabase OK');
+    ui.alert('✅ Conexión Supabase', 'La conexión con Supabase funciona correctamente', ui.ButtonSet.OK);
+  } else {
+    Logger.log('❌ Error conexión Supabase: ' + resultado.error);
+    ui.alert('❌ Error Supabase', 'Error: ' + resultado.error, ui.ButtonSet.OK);
+  }
+
+  return resultado;
+}
+
+// ============================================================================
+// 9. SINCRONIZACIÓN INICIAL - EJECUTAR UNA SOLA VEZ
+// ============================================================================
+
+/**
+ * FUNCIÓN DE SINCRONIZACIÓN INICIAL - EJECUTAR UNA SOLA VEZ
+ *
+ * Sincroniza TODOS los jornales históricos existentes a Supabase
+ * Esta función debe ejecutarse manualmente UNA VEZ después de implementar el nuevo código
+ */
+function sincronizarTodosLosJornalesASupabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_HISTORICO);
+
+  if (!sheet) {
+    Logger.log('❌ Hoja Jornales_Historico_Acumulado no encontrada');
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('❌ Error', 'Hoja "Jornales_Historico_Acumulado" no encontrada', ui.ButtonSet.OK);
+    return { success: false, error: 'Hoja no encontrada' };
+  }
+
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    Logger.log('ℹ️ No hay datos históricos para sincronizar');
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('ℹ️ Sin datos', 'No hay datos históricos para sincronizar', ui.ButtonSet.OK);
+    return { success: true, count: 0, message: 'No hay datos' };
+  }
+
+  // Leer TODOS los datos (saltando el encabezado)
+  // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
+  const datos = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+
+  Logger.log(`📊 Encontrados ${datos.length} jornales históricos para sincronizar`);
+
+  // Mostrar confirmación antes de empezar
+  const ui = SpreadsheetApp.getUi();
+  const respuesta = ui.alert(
+    '🔄 Sincronización Inicial',
+    `Se encontraron ${datos.length} jornales históricos.\n\n` +
+    `¿Desea sincronizarlos todos a Supabase?\n\n` +
+    `(Esto puede tardar 5-10 minutos)`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (respuesta !== ui.Button.YES) {
+    Logger.log('❌ Sincronización cancelada por el usuario');
+    return { success: false, cancelled: true };
+  }
+
+  // Enviar en lotes
+  const resultado = enviarJornalesASupabase(datos);
+
+  Logger.log(`✅ Sincronización inicial completada: ${resultado.count}/${datos.length} jornales enviados`);
+
+  // Mostrar resultado en la UI
+  if (resultado.count > 0) {
+    ui.alert(
+      '✅ Sincronización Completa',
+      `Se sincronizaron ${resultado.count} de ${datos.length} jornales históricos a Supabase.\n\n` +
+      `${resultado.descartados || 0} registros descartados (fechas inválidas).\n\n` +
+      `Ahora el trigger automático mantendrá todo sincronizado cada 5 minutos.`,
+      ui.ButtonSet.OK
+    );
+  } else {
+    ui.alert(
+      '⚠️ Sincronización Incompleta',
+      `No se pudo sincronizar ningún jornal.\n\n` +
+      `Descartados: ${resultado.descartados || 0}\n` +
+      `Errores de lote: ${resultado.erroresLote || 0}\n\n` +
+      `Revisa los logs para más detalles.`,
+      ui.ButtonSet.OK
+    );
+  }
+
+  return {
+    success: true,
+    total: datos.length,
+    enviados: resultado.count,
+    descartados: resultado.descartados || 0
+  };
 }
