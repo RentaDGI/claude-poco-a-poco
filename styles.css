@@ -1436,6 +1436,27 @@ body::before {
   color: white;
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+  background: linear-gradient(135deg, #ff5555 0%, #dd0000 100%);
+}
+
+.btn-danger:active {
+  transform: translateY(0);
+}
+
 /* Botón de instalación PWA flotante */
 .install-pwa-btn {
   position: fixed;
@@ -2085,6 +2106,30 @@ body::before {
   font-weight: 700;
   margin-left: 0.25rem;
   vertical-align: middle;
+}
+
+/* Botón para editar jornales manuales */
+.btn-edit-jornal {
+  background: linear-gradient(135deg, var(--puerto-teal) 0%, var(--puerto-blue) 100%);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-edit-jornal:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-edit-jornal:active {
+  transform: translateY(0);
 }
 
 /* Mejorar estilos del modal para formularios largos */

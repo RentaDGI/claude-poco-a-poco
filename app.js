@@ -1331,6 +1331,7 @@ function createQuincenaCard(year, month, quincena, jornales) {
               <th style="white-space: nowrap;">Empresa</th>
               <th style="white-space: nowrap;">Buque</th>
               <th style="white-space: nowrap;">Parte</th>
+              <th style="white-space: nowrap;">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -1345,6 +1346,13 @@ function createQuincenaCard(year, month, quincena, jornales) {
                 <td style="white-space: nowrap;">${row.empresa}</td>
                 <td style="white-space: nowrap;">${row.buque}</td>
                 <td style="white-space: nowrap;">${row.parte}</td>
+                <td style="white-space: nowrap;">
+                  ${row.manual ? `
+                    <button class="btn-edit-jornal" onclick='window.abrirModalEditarJornal(${JSON.stringify(row)})' title="Editar jornal">
+                      ✏️
+                    </button>
+                  ` : '-'}
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -3491,7 +3499,7 @@ async function loadSueldometro() {
 }
 
 /**
- * Inicializar funcionalidad de añadir jornal manual
+ * Inicializar funcionalidad de añadir/editar jornal manual
  */
 function initAddJornalManual() {
   const addBtn = document.getElementById('add-jornal-btn');
@@ -3499,6 +3507,13 @@ function initAddJornalManual() {
   const closeBtn = document.getElementById('close-jornal-modal');
   const cancelBtn = document.getElementById('cancel-jornal');
   const saveBtn = document.getElementById('save-jornal');
+  const deleteBtn = document.getElementById('delete-jornal');
+
+  const modalTitle = document.getElementById('jornal-modal-title');
+  const modeInput = document.getElementById('jornal-mode');
+  const originalFechaInput = document.getElementById('jornal-original-fecha');
+  const originalJornadaInput = document.getElementById('jornal-original-jornada');
+  const originalPuestoInput = document.getElementById('jornal-original-puesto');
 
   const fechaInput = document.getElementById('jornal-fecha');
   const jornadaSelect = document.getElementById('jornal-jornada');
@@ -3515,9 +3530,12 @@ function initAddJornalManual() {
 
   if (!addBtn || !modal) return;
 
-  // Abrir modal
-  addBtn.addEventListener('click', () => {
-    modal.style.display = 'flex';
+  // Función para limpiar y abrir modal en modo AÑADIR
+  const abrirModalAñadir = () => {
+    modeInput.value = 'add';
+    modalTitle.textContent = '➕ Añadir Jornal Manual';
+    deleteBtn.style.display = 'none';
+
     // Limpiar formulario
     fechaInput.value = '';
     jornadaSelect.value = '';
@@ -3532,7 +3550,54 @@ function initAddJornalManual() {
     errorMsg.style.display = 'none';
     successMsg.textContent = '';
     successMsg.style.display = 'none';
-  });
+
+    modal.style.display = 'flex';
+  };
+
+  // Función global para abrir modal en modo EDITAR
+  window.abrirModalEditarJornal = (jornal) => {
+    modeInput.value = 'edit';
+    modalTitle.textContent = '✏️ Editar Jornal Manual';
+    deleteBtn.style.display = 'inline-block';
+
+    // Guardar datos originales
+    originalFechaInput.value = jornal.fecha;
+    originalJornadaInput.value = jornal.jornada;
+    originalPuestoInput.value = jornal.puesto;
+
+    // Llenar formulario con datos del jornal
+    // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para input type="date"
+    const [dia, mes, anio] = jornal.fecha.split('/');
+    fechaInput.value = `${anio}-${mes}-${dia}`;
+
+    jornadaSelect.value = jornal.jornada;
+    tipoDiaSelect.value = jornal.tipo_dia || 'LABORABLE';
+
+    // Verificar si el puesto está en la lista o es "otro"
+    const puestosComunes = ['Especialista', 'Conductor de 1a', 'Conductor de 2a', 'Conductor de Coches', 'Trincador', 'Trincador de Coches'];
+    if (puestosComunes.includes(jornal.puesto)) {
+      puestoSelect.value = jornal.puesto;
+      puestoOtroGroup.style.display = 'none';
+    } else {
+      puestoSelect.value = 'otro';
+      puestoOtroInput.value = jornal.puesto;
+      puestoOtroGroup.style.display = 'block';
+    }
+
+    empresaInput.value = jornal.empresa;
+    buqueInput.value = jornal.buque || '';
+    parteInput.value = jornal.parte || '1';
+
+    errorMsg.textContent = '';
+    errorMsg.style.display = 'none';
+    successMsg.textContent = '';
+    successMsg.style.display = 'none';
+
+    modal.style.display = 'flex';
+  };
+
+  // Abrir modal en modo añadir
+  addBtn.addEventListener('click', abrirModalAñadir);
 
   // Cerrar modal
   const cerrarModal = () => {
@@ -3556,10 +3621,12 @@ function initAddJornalManual() {
     }
   });
 
-  // Guardar jornal
+  // Guardar jornal (AÑADIR O EDITAR)
   saveBtn.addEventListener('click', async () => {
     errorMsg.style.display = 'none';
     successMsg.style.display = 'none';
+
+    const modo = modeInput.value;
 
     // Validar campos obligatorios
     if (!fechaInput.value || !jornadaSelect.value || !tipoDiaSelect.value || !puestoSelect.value || !empresaInput.value) {
@@ -3584,39 +3651,103 @@ function initAddJornalManual() {
     const fechaFormateada = `${fechaParts[2]}/${fechaParts[1]}/${fechaParts[0]}`;
 
     // Crear objeto jornal
-    const nuevoJornal = {
+    const datosJornal = {
       chapa: AppState.currentUser,
       fecha: fechaFormateada,
       jornada: jornadaSelect.value,
-      tipo_dia: tipoDiaSelect.value, // Necesario para cálculo de salario
+      tipo_dia: tipoDiaSelect.value,
       puesto: puestoFinal,
-      empresa: empresaInput.value, // Select, no necesita trim
+      empresa: empresaInput.value,
       buque: buqueInput.value.trim() || '--',
       parte: parteInput.value || '1',
-      manual: true // Marcar como añadido manualmente
+      manual: true
     };
 
-    console.log('💾 Guardando jornal manual:', nuevoJornal);
+    console.log(`💾 ${modo === 'edit' ? 'Actualizando' : 'Guardando'} jornal manual:`, datosJornal);
 
     try {
-      // Guardar en localStorage
       let historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
 
-      // Verificar duplicados
-      const existe = historico.some(j =>
-        j.fecha === nuevoJornal.fecha &&
-        j.jornada === nuevoJornal.jornada &&
-        j.puesto === nuevoJornal.puesto
-      );
+      if (modo === 'add') {
+        // MODO AÑADIR
+        // Verificar duplicados
+        const existe = historico.some(j =>
+          j.fecha === datosJornal.fecha &&
+          j.jornada === datosJornal.jornada &&
+          j.puesto === datosJornal.puesto
+        );
 
-      if (existe) {
-        errorMsg.textContent = 'Ya existe un jornal con estos datos';
-        errorMsg.style.display = 'block';
-        return;
+        if (existe) {
+          errorMsg.textContent = 'Ya existe un jornal con estos datos';
+          errorMsg.style.display = 'block';
+          return;
+        }
+
+        // Añadir nuevo jornal
+        historico.push(datosJornal);
+
+        // Guardar en Google Sheets
+        SheetsAPI.saveJornalManual(
+          AppState.currentUser,
+          datosJornal.fecha,
+          datosJornal.jornada,
+          datosJornal.tipo_dia,
+          datosJornal.puesto,
+          datosJornal.empresa,
+          datosJornal.buque,
+          datosJornal.parte
+        ).then(success => {
+          if (success) {
+            console.log('✅ Jornal también guardado en Google Sheets');
+          }
+        }).catch(err => {
+          console.error('❌ Error guardando en Sheets (continuando):', err);
+        });
+
+        successMsg.textContent = '✅ Jornal añadido correctamente';
+
+      } else {
+        // MODO EDITAR
+        const fechaOriginal = originalFechaInput.value;
+        const jornadaOriginal = originalJornadaInput.value;
+        const puestoOriginal = originalPuestoInput.value;
+
+        // Buscar y actualizar el jornal en localStorage
+        const index = historico.findIndex(j =>
+          j.fecha === fechaOriginal &&
+          j.jornada === jornadaOriginal &&
+          j.puesto === puestoOriginal &&
+          j.manual === true
+        );
+
+        if (index === -1) {
+          errorMsg.textContent = 'No se encontró el jornal para actualizar';
+          errorMsg.style.display = 'block';
+          return;
+        }
+
+        // Actualizar el jornal
+        historico[index] = datosJornal;
+
+        // Actualizar en Google Sheets
+        SheetsAPI.updateJornalManual(
+          {
+            chapa: AppState.currentUser,
+            fecha: fechaOriginal,
+            jornada: jornadaOriginal,
+            puesto: puestoOriginal
+          },
+          datosJornal
+        ).then(success => {
+          if (success) {
+            console.log('✅ Jornal también actualizado en Google Sheets');
+          }
+        }).catch(err => {
+          console.error('❌ Error actualizando en Sheets (continuando):', err);
+        });
+
+        successMsg.textContent = '✅ Jornal actualizado correctamente';
       }
-
-      // Añadir nuevo jornal
-      historico.push(nuevoJornal);
 
       // Ordenar por fecha (más recientes primero)
       historico.sort((a, b) => {
@@ -3630,38 +3761,17 @@ function initAddJornalManual() {
       // Guardar en localStorage
       localStorage.setItem('jornales_historico', JSON.stringify(historico));
 
-      // Guardar también en Google Sheets para persistencia permanente
-      SheetsAPI.saveJornalManual(
-        AppState.currentUser,
-        nuevoJornal.fecha,
-        nuevoJornal.jornada,
-        nuevoJornal.tipo_dia,
-        nuevoJornal.puesto,
-        nuevoJornal.empresa,
-        nuevoJornal.buque,
-        nuevoJornal.parte
-      ).then(success => {
-        if (success) {
-          console.log('✅ Jornal también guardado en Google Sheets');
-        }
-      }).catch(err => {
-        console.error('❌ Error guardando en Sheets (continuando):', err);
-      });
-
       console.log('✅ Jornal guardado correctamente en localStorage');
 
       // Mostrar mensaje de éxito
-      successMsg.textContent = '✅ Jornal añadido correctamente y guardado permanentemente';
       successMsg.style.display = 'block';
 
       // Recargar automáticamente las vistas
       setTimeout(async () => {
-        // Recargar Mis Jornales si estamos en esa página
         if (document.getElementById('page-jornales').classList.contains('active')) {
           await loadJornales();
         }
 
-        // Recargar Sueldómetro si estamos en esa página
         if (document.getElementById('page-sueldometro').classList.contains('active')) {
           await loadSueldometro();
         }
@@ -3672,6 +3782,83 @@ function initAddJornalManual() {
     } catch (error) {
       console.error('❌ Error guardando jornal:', error);
       errorMsg.textContent = 'Error al guardar el jornal. Inténtalo de nuevo.';
+      errorMsg.style.display = 'block';
+    }
+  });
+
+  // ELIMINAR jornal
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este jornal? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+
+    const fechaOriginal = originalFechaInput.value;
+    const jornadaOriginal = originalJornadaInput.value;
+    const puestoOriginal = originalPuestoInput.value;
+
+    console.log('🗑️ Eliminando jornal:', { fecha: fechaOriginal, jornada: jornadaOriginal, puesto: puestoOriginal });
+
+    try {
+      let historico = JSON.parse(localStorage.getItem('jornales_historico') || '[]');
+
+      // Buscar y eliminar el jornal
+      const index = historico.findIndex(j =>
+        j.fecha === fechaOriginal &&
+        j.jornada === jornadaOriginal &&
+        j.puesto === puestoOriginal &&
+        j.manual === true
+      );
+
+      if (index === -1) {
+        errorMsg.textContent = 'No se encontró el jornal para eliminar';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      // Eliminar de la lista
+      historico.splice(index, 1);
+
+      // Guardar en localStorage
+      localStorage.setItem('jornales_historico', JSON.stringify(historico));
+
+      // Eliminar de Google Sheets
+      SheetsAPI.deleteJornalManual(
+        AppState.currentUser,
+        fechaOriginal,
+        jornadaOriginal,
+        puestoOriginal
+      ).then(success => {
+        if (success) {
+          console.log('✅ Jornal también eliminado de Google Sheets');
+        }
+      }).catch(err => {
+        console.error('❌ Error eliminando de Sheets (continuando):', err);
+      });
+
+      console.log('✅ Jornal eliminado correctamente');
+
+      successMsg.textContent = '✅ Jornal eliminado correctamente';
+      successMsg.style.display = 'block';
+
+      // Recargar vistas
+      setTimeout(async () => {
+        if (document.getElementById('page-jornales').classList.contains('active')) {
+          await loadJornales();
+        }
+
+        if (document.getElementById('page-sueldometro').classList.contains('active')) {
+          await loadSueldometro();
+        }
+
+        cerrarModal();
+      }, 1500);
+
+    } catch (error) {
+      console.error('❌ Error eliminando jornal:', error);
+      errorMsg.textContent = 'Error al eliminar el jornal. Inténtalo de nuevo.';
       errorMsg.style.display = 'block';
     }
   });

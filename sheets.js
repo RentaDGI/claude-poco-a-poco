@@ -1613,6 +1613,66 @@ const SheetsAPI = {
       console.error('❌ Error en getJornalesManuales:', error);
       return [];
     }
+  },
+
+  /**
+   * Elimina un jornal manual de Google Sheets
+   */
+  async deleteJornalManual(chapa, fecha, jornada, puesto) {
+    try {
+      await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteJornalManual',
+          chapa: chapa,
+          fecha: fecha,
+          jornada: jornada,
+          puesto: puesto
+        })
+      });
+
+      console.log(`✅ Jornal manual eliminado de Sheets: ${fecha} ${jornada} (no-cors mode)`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error en deleteJornalManual:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Actualiza un jornal manual en Google Sheets
+   */
+  async updateJornalManual(datosOriginales, datosNuevos) {
+    try {
+      await fetch(SHEETS_CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateJornalManual',
+          chapaOriginal: datosOriginales.chapa,
+          fechaOriginal: datosOriginales.fecha,
+          jornadaOriginal: datosOriginales.jornada,
+          puestoOriginal: datosOriginales.puesto,
+          chapa: datosNuevos.chapa,
+          fecha: datosNuevos.fecha,
+          jornada: datosNuevos.jornada,
+          tipo_dia: datosNuevos.tipo_dia,
+          puesto: datosNuevos.puesto,
+          empresa: datosNuevos.empresa,
+          buque: datosNuevos.buque,
+          parte: datosNuevos.parte
+        })
+      });
+
+      console.log(`✅ Jornal manual actualizado en Sheets: ${datosNuevos.fecha} ${datosNuevos.jornada} (no-cors mode)`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error en updateJornalManual:', error);
+      return false;
+    }
   }
 };
 

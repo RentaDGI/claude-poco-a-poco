@@ -45,7 +45,9 @@ function doPost(e) {
       'savePrimaPersonalizada': savePrimaPersonalizada,
       'getPrimasPersonalizadas': getPrimasPersonalizadas,
       'saveJornalManual': saveJornalManual,
-      'getJornalesManuales': getJornalesManuales
+      'getJornalesManuales': getJornalesManuales,
+      'deleteJornalManual': deleteJornalManual,
+      'updateJornalManual': updateJornalManual
     };
 
     const handler = handlers[action];
@@ -383,6 +385,126 @@ function saveJornalManual(params) {
 function getJornalesManuales(params) {
   Logger.log('ℹ️ getJornalesManuales: Los jornales manuales ahora se leen desde Jornales_Historico_Acumulado via CSV');
   return jsonResponse(true, [], 'Los jornales manuales se leen desde CSV público');
+}
+
+/**
+ * Elimina un jornal manual del histórico acumulado
+ */
+function deleteJornalManual(params) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_HISTORICO);
+
+    if (!sheet) {
+      throw new Error('Hoja Jornales_Historico_Acumulado no encontrada');
+    }
+
+    const chapa = params.chapa;
+    const fecha = params.fecha;
+    const jornada = params.jornada;
+    const puesto = params.puesto;
+
+    // Validar parámetros requeridos
+    if (!chapa || !fecha || !jornada || !puesto) {
+      throw new Error('Faltan parámetros requeridos para eliminar');
+    }
+
+    // Buscar y eliminar la fila
+    // Columnas: Fecha, Chapa, Puesto, Jornada, Empresa, Buque, Parte, Origen
+    const data = sheet.getDataRange().getValues();
+    let filaEliminada = false;
+
+    for (let i = data.length - 1; i >= 1; i--) { // Empezar desde el final para evitar problemas al eliminar
+      if (data[i][0] == fecha &&
+          data[i][1] == chapa &&
+          data[i][2] == puesto &&
+          data[i][3] == jornada &&
+          data[i][7] == 'MANUAL') { // Solo eliminar si es MANUAL
+        sheet.deleteRow(i + 1);
+        filaEliminada = true;
+        Logger.log(`✅ Jornal manual eliminado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+        break; // Solo eliminar la primera coincidencia
+      }
+    }
+
+    if (!filaEliminada) {
+      return jsonResponse(false, null, 'No se encontró el jornal para eliminar');
+    }
+
+    return jsonResponse(true, null, 'Jornal eliminado correctamente');
+
+  } catch (error) {
+    Logger.log(`❌ deleteJornalManual: ${error.message}`);
+    return jsonResponse(false, null, error.message);
+  }
+}
+
+/**
+ * Actualiza un jornal manual en el histórico acumulado
+ */
+function updateJornalManual(params) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.HOJAS.JORNALES_HISTORICO);
+
+    if (!sheet) {
+      throw new Error('Hoja Jornales_Historico_Acumulado no encontrada');
+    }
+
+    // Parámetros originales (para identificar la fila)
+    const chapaOriginal = params.chapaOriginal;
+    const fechaOriginal = params.fechaOriginal;
+    const jornadaOriginal = params.jornadaOriginal;
+    const puestoOriginal = params.puestoOriginal;
+
+    // Nuevos valores
+    const chapa = params.chapa;
+    const fecha = params.fecha;
+    const jornada = params.jornada;
+    const tipo_dia = params.tipo_dia;
+    const puesto = params.puesto;
+    const empresa = params.empresa;
+    const buque = params.buque || '--';
+    const parte = params.parte || '1';
+
+    // Validar parámetros
+    if (!chapaOriginal || !fechaOriginal || !jornadaOriginal || !puestoOriginal) {
+      throw new Error('Faltan parámetros originales para identificar el jornal');
+    }
+
+    if (!chapa || !fecha || !jornada || !puesto || !empresa) {
+      throw new Error('Faltan parámetros nuevos requeridos');
+    }
+
+    // Buscar y actualizar la fila
+    const data = sheet.getDataRange().getValues();
+    let filaActualizada = false;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == fechaOriginal &&
+          data[i][1] == chapaOriginal &&
+          data[i][2] == puestoOriginal &&
+          data[i][3] == jornadaOriginal &&
+          data[i][7] == 'MANUAL') { // Solo actualizar si es MANUAL
+
+        // Actualizar los valores
+        sheet.getRange(i + 1, 1, 1, 7).setValues([[fecha, chapa, puesto, jornada, empresa, buque, parte]]);
+        filaActualizada = true;
+        Logger.log(`✅ Jornal manual actualizado: ${chapa} ${fecha} ${jornada} ${puesto}`);
+        break;
+      }
+    }
+
+    if (!filaActualizada) {
+      return jsonResponse(false, null, 'No se encontró el jornal para actualizar');
+    }
+
+    return jsonResponse(true, null, 'Jornal actualizado correctamente');
+
+  } catch (error) {
+    Logger.log(`❌ updateJornalManual: ${error.message}`);
+    return jsonResponse(false, null, error.message);
+  }
 }
 
 // ============================================================================
