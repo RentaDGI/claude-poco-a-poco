@@ -3,9 +3,6 @@
  *
  * Funcionalidades:
  * 1. Gestión de mensajes del foro
- *    - Agregar mensajes con anti-duplicados
- *    - Corrección automática de orden de columnas
- *    - Limpieza de mensajes duplicados/vacíos
  * 2. Cambio de contraseñas
  * 3. Importación CSV automática cada 5 min + pivot a histórico (SIN DUPLICADOS)
  * 4. Gestión de IRPF personalizado
@@ -109,7 +106,6 @@ function addMessage(params) {
       }
     }
 
-    // ORDEN CORRECTO: timestamp, chapa, texto
     sheet.appendRow([timestamp, chapa, texto]);
     Logger.log(`✅ Mensaje añadido: ${chapa}`);
     return jsonResponse(true, null, 'Mensaje agregado');
@@ -117,123 +113,6 @@ function addMessage(params) {
   } catch (error) {
     Logger.log('❌ addMessage: ' + error);
     return jsonResponse(false, null, error.toString());
-  }
-}
-
-/**
- * Detecta y corrige mensajes del foro con columnas en orden incorrecto
- * Orden correcto: [timestamp, chapa, texto]
- * Orden incorrecto: [chapa, timestamp, texto]
- */
-function corregirOrdenColumnasForo() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.HOJAS.FORO);
-
-    if (!sheet) {
-      throw new Error('Hoja "Foro" no encontrada');
-    }
-
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 1) {
-      Logger.log('ℹ️ Hoja vacía');
-      return { success: true, corregidas: 0 };
-    }
-
-    const data = sheet.getDataRange().getValues();
-    let corregidas = 0;
-
-    // Empezar desde la fila 1 (índice 0 en el array)
-    for (let i = 0; i < data.length; i++) {
-      const [col1, col2, col3] = data[i];
-
-      // Detectar orden incorrecto:
-      // - col1 es un número (chapa) en lugar de timestamp ISO
-      // - col2 es un timestamp ISO en lugar de número (chapa)
-      const col1Str = String(col1).trim();
-      const col2Str = String(col2).trim();
-
-      // Si col1 es solo dígitos (chapa) y col2 parece timestamp ISO
-      const col1EsNumero = /^\d+$/.test(col1Str);
-      const col2EsTimestamp = /^\d{4}-\d{2}-\d{2}T/.test(col2Str);
-
-      if (col1EsNumero && col2EsTimestamp) {
-        // Orden incorrecto detectado: [chapa, timestamp, texto]
-        // Corregir a: [timestamp, chapa, texto]
-        const timestamp = col2;
-        const chapa = col1;
-        const texto = col3;
-
-        sheet.getRange(i + 1, 1).setValue(timestamp);
-        sheet.getRange(i + 1, 2).setValue(chapa);
-        sheet.getRange(i + 1, 3).setValue(texto);
-
-        Logger.log(`✅ Fila ${i + 1} corregida: ${chapa} - ${timestamp}`);
-        corregidas++;
-      }
-    }
-
-    Logger.log(`✅ Proceso completado: ${corregidas} filas corregidas de ${data.length} totales`);
-    return { success: true, corregidas: corregidas, total: data.length };
-
-  } catch (error) {
-    Logger.log('❌ corregirOrdenColumnasForo: ' + error);
-    return { success: false, error: error.toString() };
-  }
-}
-
-/**
- * Elimina mensajes duplicados o vacíos del foro
- */
-function limpiarMensajesForo() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.HOJAS.FORO);
-
-    if (!sheet) {
-      throw new Error('Hoja "Foro" no encontrada');
-    }
-
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 1) {
-      Logger.log('ℹ️ Hoja vacía');
-      return { success: true, eliminadas: 0 };
-    }
-
-    const data = sheet.getDataRange().getValues();
-    const mensajesUnicos = new Set();
-    const filasAEliminar = [];
-
-    for (let i = 0; i < data.length; i++) {
-      const [timestamp, chapa, texto] = data[i];
-
-      // Detectar filas vacías o inválidas
-      if (!timestamp || !chapa || !texto || String(texto).trim() === '') {
-        filasAEliminar.push(i + 1);
-        continue;
-      }
-
-      // Detectar duplicados exactos
-      const key = `${timestamp}|${chapa}|${texto}`;
-      if (mensajesUnicos.has(key)) {
-        filasAEliminar.push(i + 1);
-        Logger.log(`⚠️ Duplicado detectado en fila ${i + 1}`);
-      } else {
-        mensajesUnicos.add(key);
-      }
-    }
-
-    // Eliminar filas en orden inverso (para no afectar los índices)
-    for (let i = filasAEliminar.length - 1; i >= 0; i--) {
-      sheet.deleteRow(filasAEliminar[i]);
-    }
-
-    Logger.log(`✅ Limpieza completada: ${filasAEliminar.length} filas eliminadas`);
-    return { success: true, eliminadas: filasAEliminar.length };
-
-  } catch (error) {
-    Logger.log('❌ limpiarMensajesForo: ' + error);
-    return { success: false, error: error.toString() };
   }
 }
 
@@ -647,22 +526,11 @@ function pivotContrataGlideToJornales() {
 // 7. MENÚ PERSONALIZADO
 // ============================================================================
 function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-
-  ui.createMenu('🌀 Importación CSV')
+  SpreadsheetApp.getUi()
+    .createMenu('🌀 Importación CSV')
     .addItem('📥 Actualizar "contrata_glide" AHORA', 'importarCSVManualmente')
     .addSeparator()
     .addItem('⚙️ Ver triggers activos', 'verTriggers')
-    .addToUi();
-
-  ui.createMenu('💬 Foro - Mantenimiento')
-    .addItem('🔧 Corregir orden de columnas', 'corregirOrdenColumnasForo')
-    .addItem('🧹 Limpiar mensajes duplicados/vacíos', 'limpiarMensajesForo')
-    .addToUi();
-
-  ui.createMenu('👤 Administración')
-    .addItem('🔑 Ver todas las contraseñas', 'mostrarTodasLasContrasenas')
-    .addItem('📊 Estadísticas de usuarios', 'mostrarEstadisticasUsuarios')
     .addToUi();
 }
 
@@ -734,166 +602,4 @@ function verTriggers() {
   }
 
   return info;
-}
-
-// ============================================================================
-// 9. FUNCIONES DE ADMINISTRACIÓN
-// ============================================================================
-
-/**
- * Muestra todas las contraseñas de usuarios en una ventana emergente
- * Solo el administrador (propietario del Sheet) puede ejecutar esto
- */
-function mostrarTodasLasContrasenas() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.HOJAS.USUARIOS);
-
-    if (!sheet) {
-      SpreadsheetApp.getUi().alert('❌ Error', 'Hoja "Usuarios" no encontrada', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const chapaCol = headers.indexOf('Chapa');
-    const passCol = headers.indexOf('Contraseña');
-    const nombreCol = headers.indexOf('Nombre');
-
-    if (chapaCol === -1 || passCol === -1) {
-      SpreadsheetApp.getUi().alert('❌ Error', 'Columnas no encontradas', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-
-    // Recopilar usuarios con contraseñas
-    const usuarios = [];
-    for (let i = 1; i < data.length; i++) {
-      const chapa = data[i][chapaCol];
-      const password = data[i][passCol];
-      const nombre = nombreCol >= 0 ? data[i][nombreCol] : '';
-
-      if (chapa) {
-        usuarios.push({
-          chapa: chapa,
-          nombre: nombre || '(sin nombre)',
-          password: password || '(sin contraseña)'
-        });
-      }
-    }
-
-    // Ordenar por chapa
-    usuarios.sort((a, b) => String(a.chapa).localeCompare(String(b.chapa)));
-
-    // Generar mensaje para mostrar
-    let mensaje = `TOTAL: ${usuarios.length} usuarios registrados\n\n`;
-    mensaje += '═'.repeat(50) + '\n\n';
-
-    usuarios.forEach((u, i) => {
-      mensaje += `${i + 1}. Chapa ${u.chapa}\n`;
-      if (u.nombre !== '(sin nombre)') {
-        mensaje += `   Nombre: ${u.nombre}\n`;
-      }
-      mensaje += `   Contraseña: ${u.password}\n`;
-      mensaje += '─'.repeat(40) + '\n';
-    });
-
-    // Mostrar en ventana emergente
-    const ui = SpreadsheetApp.getUi();
-    const htmlOutput = HtmlService.createHtmlOutput(
-      `<style>
-        body { font-family: monospace; white-space: pre-wrap; padding: 20px; font-size: 12px; }
-        .header { font-weight: bold; color: #1a73e8; margin-bottom: 20px; }
-        .user { margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
-        .chapa { font-weight: bold; color: #202124; }
-        .password { color: #d93025; font-weight: bold; }
-      </style>
-      <div class="header">🔑 CONTRASEÑAS DE USUARIOS (${usuarios.length} total)</div>
-      ${usuarios.map((u, i) => `
-        <div class="user">
-          <div class="chapa">${i + 1}. Chapa ${u.chapa} ${u.nombre !== '(sin nombre)' ? '- ' + u.nombre : ''}</div>
-          <div class="password">Contraseña: ${u.password}</div>
-        </div>
-      `).join('')}
-      `
-    )
-      .setWidth(600)
-      .setHeight(500);
-
-    ui.showModalDialog(htmlOutput, '🔑 Panel de Contraseñas - CONFIDENCIAL');
-
-    Logger.log(`✅ Contraseñas mostradas: ${usuarios.length} usuarios`);
-
-  } catch (error) {
-    Logger.log('❌ mostrarTodasLasContrasenas: ' + error);
-    SpreadsheetApp.getUi().alert('❌ Error', error.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
-/**
- * Muestra estadísticas de usuarios
- */
-function mostrarEstadisticasUsuarios() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheetUsuarios = ss.getSheetByName(CONFIG.HOJAS.USUARIOS);
-    const sheetForo = ss.getSheetByName(CONFIG.HOJAS.FORO);
-
-    if (!sheetUsuarios) {
-      SpreadsheetApp.getUi().alert('❌ Error', 'Hoja "Usuarios" no encontrada', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-
-    const dataUsuarios = sheetUsuarios.getDataRange().getValues();
-    const totalUsuarios = dataUsuarios.length - 1; // Menos la cabecera
-
-    // Contar usuarios con contraseña configurada
-    const headers = dataUsuarios[0];
-    const passCol = headers.indexOf('Contraseña');
-    let usuariosConPassword = 0;
-    let usuariosSinPassword = 0;
-
-    for (let i = 1; i < dataUsuarios.length; i++) {
-      const password = dataUsuarios[i][passCol];
-      if (password && password.toString().trim() !== '') {
-        usuariosConPassword++;
-      } else {
-        usuariosSinPassword++;
-      }
-    }
-
-    // Contar mensajes del foro
-    let totalMensajes = 0;
-    if (sheetForo) {
-      const dataForo = sheetForo.getDataRange().getValues();
-      totalMensajes = dataForo.length > 0 ? dataForo.length - 1 : 0; // Menos cabecera si existe
-    }
-
-    // Generar estadísticas
-    const mensaje = `
-📊 ESTADÍSTICAS DEL PORTAL
-
-═══════════════════════════════════════
-
-👥 USUARIOS
-   Total registrados: ${totalUsuarios}
-   Con contraseña: ${usuariosConPassword}
-   Sin contraseña: ${usuariosSinPassword}
-
-💬 FORO
-   Mensajes totales: ${totalMensajes}
-
-📅 ÚLTIMA ACTUALIZACIÓN
-   ${new Date().toLocaleString('es-ES')}
-
-═══════════════════════════════════════
-    `;
-
-    SpreadsheetApp.getUi().alert('📊 Estadísticas del Portal', mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
-
-    Logger.log('✅ Estadísticas mostradas');
-
-  } catch (error) {
-    Logger.log('❌ mostrarEstadisticasUsuarios: ' + error);
-    SpreadsheetApp.getUi().alert('❌ Error', error.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
-  }
 }
