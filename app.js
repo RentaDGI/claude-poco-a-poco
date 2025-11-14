@@ -2515,6 +2515,10 @@ function determinarTipoDia(fecha, jornada) {
       // IMPORTANTE: Sábado siempre se considera LABORABLE en jornada 02-08
       if (dayOfWeek === 6) {
         return 'LABORABLE';
+      } else if (esFestivoAyer && esFestivoHoy) {
+        // NUEVO: Si ayer fue festivo Y hoy también es festivo → FEST-FEST
+        // Ejemplo: día 1 noviembre (festivo Todos los Santos) → día 2 noviembre (domingo/festivo)
+        return 'FEST-FEST';
       } else if (esFestivoHoy && !esFestivoManana) {
         return 'FEST-LAB';
       } else if (esFestivoManana) {
@@ -3219,11 +3223,27 @@ async function loadSueldometro() {
 
       // Función auxiliar para actualizar totales
       const actualizarTotales = () => {
-        // Recalcular totales de la quincena
-        const nuevoTotalBase = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.salario_base, 0);
-        const nuevoTotalPrima = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.prima, 0);
-        const nuevoTotalBruto = jornalesConSalarioQuincena.reduce((sum, j) => sum + j.total, 0);
-        const nuevoTotalNeto = nuevoTotalBruto * (1 - irpfPorcentaje / 100);
+        // CORREGIDO: Recalcular totales desde las filas del DOM (incluyen relevo y remate)
+        const tbody = card.querySelector(`#tbody-${year}-${month}-${quincena}`);
+        const rows = tbody.querySelectorAll('tr');
+
+        let nuevoTotalBase = 0;
+        let nuevoTotalPrima = 0;
+        let nuevoTotalBruto = 0;
+        let nuevoTotalNeto = 0;
+
+        rows.forEach(row => {
+          // Leer valores desde el DOM
+          const baseText = row.querySelector('.base-value')?.textContent.replace('€', '').replace('*', '') || '0';
+          const primaText = row.querySelector('.prima-input')?.value || '0';
+          const brutoText = row.querySelector('.bruto-value strong')?.textContent.replace('€', '') || '0';
+          const netoText = row.querySelector('.neto-value strong')?.textContent.replace('€', '') || '0';
+
+          nuevoTotalBase += parseFloat(baseText);
+          nuevoTotalPrima += parseFloat(primaText);
+          nuevoTotalBruto += parseFloat(brutoText);
+          nuevoTotalNeto += parseFloat(netoText);
+        });
 
         // Actualizar el resumen de la quincena
         const summaryItems = card.querySelectorAll('.summary-value');
@@ -3231,15 +3251,29 @@ async function loadSueldometro() {
         summaryItems[2].textContent = `${nuevoTotalPrima.toFixed(2)}€`; // Prima
 
         // Actualizar bruto y neto en el header
-        const brutoValue = card.querySelector('.bruto-value');
-        const netoValue = card.querySelector('.neto-value');
-        if (brutoValue) brutoValue.textContent = `${nuevoTotalBruto.toFixed(2)}€`;
-        if (netoValue) netoValue.textContent = `${nuevoTotalNeto.toFixed(2)}€`;
+        const brutoValueHeader = card.querySelector('.quincena-total .bruto-value');
+        const netoValueHeader = card.querySelector('.quincena-total .neto-value');
+        if (brutoValueHeader) brutoValueHeader.textContent = `${nuevoTotalBruto.toFixed(2)}€`;
+        if (netoValueHeader) netoValueHeader.textContent = `${nuevoTotalNeto.toFixed(2)}€`;
 
-        // Recalcular estadísticas globales
-        const totalGlobalBruto = jornalesConSalario.reduce((sum, j) => sum + j.total, 0);
-        const totalGlobalNeto = totalGlobalBruto * (1 - irpfPorcentaje / 100);
-        const promedioBruto = totalGlobalBruto / jornalesConSalario.length;
+        // CORREGIDO: Recalcular estadísticas globales desde TODAS las tarjetas del DOM
+        const todasLasCards = content.querySelectorAll('.quincena-card');
+        let totalGlobalBruto = 0;
+        let totalGlobalNeto = 0;
+        let contadorJornales = 0;
+
+        todasLasCards.forEach(cardItem => {
+          const todasLasFilas = cardItem.querySelectorAll('tbody tr');
+          todasLasFilas.forEach(fila => {
+            const brutoFila = parseFloat(fila.querySelector('.bruto-value strong')?.textContent.replace('€', '') || '0');
+            const netoFila = parseFloat(fila.querySelector('.neto-value strong')?.textContent.replace('€', '') || '0');
+            totalGlobalBruto += brutoFila;
+            totalGlobalNeto += netoFila;
+            contadorJornales++;
+          });
+        });
+
+        const promedioBruto = contadorJornales > 0 ? totalGlobalBruto / contadorJornales : 0;
 
         const statCards = stats.querySelectorAll('.stat-card .stat-value');
         if (statCards.length >= 3) {
@@ -3589,6 +3623,9 @@ async function loadSueldometro() {
           console.log(`${!isLocked ? '🔒' : '🔓'} Prima y movimientos ${!isLocked ? 'bloqueados' : 'desbloqueados'} para ${lockKey}`);
         });
       });
+
+      // IMPORTANTE: Calcular totales iniciales correctamente (incluyen relevo y remate)
+      actualizarTotales();
     });
 
     // Función para actualizar IRPF y persistir en localStorage y Sheets

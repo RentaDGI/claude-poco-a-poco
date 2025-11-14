@@ -1369,14 +1369,15 @@ const SheetsAPI = {
         coef_prima_mayor120: parseEuropeanFloat(row.Coef_Prima_Mayor120 || row.coef_prima_mayor120)
       })).filter(item => item.clave_jornada);
 
-      // WORKAROUND FORZADO: Añadir claves de sábado manualmente SIEMPRE
+      // WORKAROUND FORZADO: Añadir claves de sábado y FEST-FEST manualmente SIEMPRE
       const clavesNecesarias = [
         { clave_jornada: '08-14_SABADO', jornal_base_g1: 145.42, jornal_base_g2: 150.62, prima_minima_coches: 60.31, coef_prima_menor120: 0.374, coef_prima_mayor120: 0.612 },
         { clave_jornada: '14-20_SABADO', jornal_base_g1: 206.37, jornal_base_g2: 210.95, prima_minima_coches: 78.16, coef_prima_menor120: 0.674, coef_prima_mayor120: 0.786 },
-        { clave_jornada: '20-02_SABADO', jornal_base_g1: 295.25, jornal_base_g2: 303.88, prima_minima_coches: 78.16, coef_prima_menor120: 0.974, coef_prima_mayor120: 1.045 }
+        { clave_jornada: '20-02_SABADO', jornal_base_g1: 295.25, jornal_base_g2: 303.88, prima_minima_coches: 78.16, coef_prima_menor120: 0.974, coef_prima_mayor120: 1.045 },
+        { clave_jornada: '02-08_FEST-FEST', jornal_base_g1: 453, jornal_base_g2: 458.55, prima_minima_coches: 156.32, coef_prima_menor120: 1.309, coef_prima_mayor120: 1.405 }
       ];
 
-      console.warn('🔧 APLICANDO WORKAROUND DE SÁBADOS...');
+      console.warn('🔧 APLICANDO WORKAROUND DE SÁBADOS Y FEST-FEST...');
 
       clavesNecesarias.forEach(clave => {
         // Eliminar si existe para reemplazar
@@ -1390,7 +1391,7 @@ const SheetsAPI = {
         tablaSalarial.push(clave);
       });
 
-      console.warn('✅ WORKAROUND APLICADO - Claves de sábado forzadas en memoria');
+      console.warn('✅ WORKAROUND APLICADO - Claves de sábado y FEST-FEST forzadas en memoria');
 
       console.log(`✅ Tabla salarial cargada: ${tablaSalarial.length} registros (${tablaSalarial.length - data.length} añadidos manualmente)`);
       if (tablaSalarial.length > 0) {
