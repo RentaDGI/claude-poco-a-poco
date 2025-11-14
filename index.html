@@ -446,6 +446,30 @@
 
   </main>
 
+  <!-- MODAL - CHAPAS DEL PARTE -->
+  <div id="modal-chapas-parte" class="modal-overlay" style="display: none;">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-chapas-titulo">Chapas contratadas en el parte</h2>
+          <p id="modal-chapas-subtitulo" style="color: #ffffff; margin-top: 0.5rem; font-size: 0.9rem;"></p>
+        </div>
+        <button id="modal-chapas-close" class="modal-close-btn" aria-label="Cerrar">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-chapas-loading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Cargando chapas...</p>
+        </div>
+        <div id="modal-chapas-content"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal para cambiar contraseña -->
   <div id="change-password-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content">

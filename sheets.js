@@ -34,8 +34,8 @@ const SHEETS_CONFIG = {
   URL_MAPEO_PUESTOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=418043978',
   URL_TABLA_SALARIOS: 'https://docs.google.com/spreadsheets/d/1j-IaOHXoLEP4bK2hjdn2uAYy8a2chqiQSOw4Nfxoyxc/export?format=csv&gid=1710373929',
 
-  // URL del Apps Script (Web App deployada) - ACTUALIZADA
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxn3kv_G0-qDjJwUqOdnOIFMN0zjfz12UbvSdei9VYsJ94y2kVccpFO5ZPF2KSpx862lw/exec'
+  // URL del Apps Script (Web App deployada) - ACTUALIZADA CON FIX DE CONTRASEÑAS
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzbUwSMLx0A2dvZ1rtTkEnUi00X87NIF7zqr6q8nxNc2l1hoglmqv5Lr-5tbxs6yB8f-w/exec'
 };
 
 /**
@@ -1266,6 +1266,42 @@ const SheetsAPI = {
   },
 
   /**
+   * [ROBUSTO] Obtiene TODOS los jornales históricos acumulados (sin filtrar por chapa)
+   * Útil para obtener todas las chapas de un parte específico
+   */
+  async getAllJornalesHistoricoAcumulado() {
+    try {
+      // Lee todos los datos sin filtrar
+      const data = await fetchSheetData(SHEETS_CONFIG.SHEET_ID, SHEETS_CONFIG.GID_JORNALES_HISTORICO_ACUMULADO, false);
+
+      // Mapear todos los jornales
+      const todosLosJornales = data.map(row => {
+        const origen = (row.Origen || row.origen || '').toString().trim();
+        const esManual = origen === 'MANUAL';
+
+        return {
+          chapa: row.Chapa || row.chapa || '',
+          fecha: row.Fecha || row.fecha || '',
+          puesto: row.Puesto_Contratacion || row.puesto_contratacion || row.Puesto || row.puesto || '',
+          jornada: row.Jornada || row.jornada || '',
+          empresa: row.Empresa || row.empresa || '',
+          buque: row.Buque || row.buque || '',
+          parte: row.Parte || row.parte || '',
+          manual: esManual,
+          origen: origen
+        };
+      }).filter(item => item.fecha && item.jornada && item.chapa); // Filtrar filas sin datos esenciales
+
+      console.log(`✅ Todos los jornales históricos: ${todosLosJornales.length} registros`);
+      return todosLosJornales;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo todos los jornales históricos:', error);
+      return [];
+    }
+  },
+
+  /**
    * [ROBUSTO] Obtiene el mapeo de puestos (Puesto → Grupo_Salarial + Tipo_Operativa)
    * Para el Sueldómetro
    * Columnas esperadas: Puesto, Grupo_Salarial, Tipo_Operativa
@@ -1632,3 +1668,6 @@ function clearSheetsCache() {
 // Exponer API globalmente
 window.SheetsAPI = SheetsAPI;
 window.clearSheetsCache = clearSheetsCache;
+
+
+

@@ -3,11 +3,16 @@
  *
  * Funcionalidades:
  * 1. Gestión de mensajes del foro
- * 2. Cambio de contraseñas
+ * 2. Cambio de contraseñas (actualiza directamente en la hoja "Usuarios")
  * 3. Importación CSV automática cada 5 min + pivot a histórico (SIN DUPLICADOS)
  * 4. Gestión de IRPF personalizado
  * 5. Gestión de primas personalizadas (prima, movimientos, relevo, remate)
  * 6. Gestión de jornales manuales (persistencia permanente)
+ *
+ * FIX APLICADO: La función changePassword acepta tanto 'newPassword' como 'nuevaContrasena'
+ * para compatibilidad con diferentes versiones del frontend.
+ *
+ * NOTA: Supabase lee directamente del CSV público, no necesita sincronización desde Apps Script
  */
 
 const CONFIG = {
@@ -65,9 +70,9 @@ function doPost(e) {
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    message: 'Apps Script funcionando correctamente',
+    message: 'Apps Script funcionando correctamente con fix de contraseñas',
     timestamp: new Date().toISOString(),
-    version: '3.0-completo'
+    version: '3.1-password-fix'
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -117,7 +122,7 @@ function addMessage(params) {
 }
 
 // ============================================================================
-// 2. USUARIOS - Contraseñas
+// 2. USUARIOS - Contraseñas (FIX APLICADO)
 // ============================================================================
 function changePassword(params) {
   try {
@@ -129,7 +134,10 @@ function changePassword(params) {
     }
 
     const chapa = params.chapa.toString();
-    const nuevaContrasena = params.nuevaContrasena.toString();
+    // FIX: Aceptar tanto 'newPassword' (frontend) como 'nuevaContrasena' (compatibilidad)
+    const nuevaContrasena = (params.newPassword || params.nuevaContrasena).toString();
+
+    Logger.log(`🔐 changePassword - Chapa: ${chapa}, Nueva contraseña recibida: ${nuevaContrasena ? 'Sí' : 'No'}`);
 
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
@@ -143,16 +151,20 @@ function changePassword(params) {
     // Buscar usuario existente
     for (let i = 1; i < data.length; i++) {
       if (data[i][chapaCol].toString() === chapa) {
+        const oldPassword = data[i][passCol];
         sheet.getRange(i + 1, passCol + 1).setValue(nuevaContrasena);
         Logger.log(`✅ Contraseña actualizada para chapa ${chapa}`);
-        return jsonResponse(true, null, 'Contraseña actualizada');
+        Logger.log(`   - Contraseña anterior: ${oldPassword}`);
+        Logger.log(`   - Contraseña nueva: ${nuevaContrasena}`);
+        Logger.log(`   - Fila actualizada: ${i + 1}`);
+        return jsonResponse(true, { chapa, updated: true }, 'Contraseña actualizada correctamente');
       }
     }
 
     // Crear nuevo usuario si no existe
     sheet.appendRow([chapa, nuevaContrasena, '', '']);
-    Logger.log(`✅ Usuario creado: ${chapa}`);
-    return jsonResponse(true, null, 'Usuario creado');
+    Logger.log(`✅ Usuario creado: ${chapa} con contraseña: ${nuevaContrasena}`);
+    return jsonResponse(true, { chapa, created: true }, 'Usuario creado correctamente');
 
   } catch (error) {
     Logger.log('❌ changePassword: ' + error);

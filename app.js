@@ -1003,6 +1003,18 @@ async function loadContratacion() {
           card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
         });
 
+        // Click para abrir modal con chapas del parte
+        card.addEventListener('click', () => {
+          mostrarChapasDelParte({
+            parte: row.parte,
+            empresa: row.empresa,
+            buque: row.buque,
+            fecha: row.fecha,
+            jornada: row.jornada,
+            puesto: row.puesto
+          });
+        });
+
         cardsContainer.appendChild(card);
       });
 
@@ -1019,6 +1031,215 @@ async function loadContratacion() {
     `;
   }
 }
+
+/**
+ * Muestra el modal con todas las chapas contratadas en un parte específico,
+ * agrupadas por puesto de contratación
+ */
+async function mostrarChapasDelParte(parteInfo) {
+  const modal = document.getElementById('modal-chapas-parte');
+  const loading = document.getElementById('modal-chapas-loading');
+  const content = document.getElementById('modal-chapas-content');
+  const titulo = document.getElementById('modal-chapas-titulo');
+  const subtitulo = document.getElementById('modal-chapas-subtitulo');
+
+  if (!modal) return;
+
+  // Función para obtener el emoji de un puesto
+  const getEmojiPuesto = (puesto) => {
+    const puestoLower = puesto.toLowerCase();
+    if (puestoLower.includes('conductor de 1')) return '🚚';
+    if (puestoLower.includes('conductor de 2')) return '🚗';
+    if (puestoLower.includes('trincador de coches') || puestoLower.includes('trincador de coche')) return '👷';
+    if (puestoLower.includes('trincador')) return '👷';
+    if (puestoLower.includes('especialista')) return '👷';
+    return '👤'; // emoji por defecto
+  };
+
+  // Mostrar modal
+  modal.style.display = 'flex';
+  loading.classList.remove('hidden');
+  content.innerHTML = '';
+
+  // Actualizar título
+  titulo.textContent = `Parte ${parteInfo.parte}`;
+  subtitulo.textContent = `${parteInfo.empresa} • ${parteInfo.buque} • ${parteInfo.fecha} • ${parteInfo.jornada}`;
+
+  try {
+    console.log('🔍 Buscando chapas para el parte:', parteInfo.parte);
+
+    // Obtener TODOS los jornales del histórico (sin filtrar por usuario)
+    const jornalesHistorico = await SheetsAPI.getAllJornalesHistoricoAcumulado();
+
+    // Filtrar chapas del mismo parte, fecha y jornada
+    const chapasDelParte = jornalesHistorico.filter(jornal => {
+      return jornal.parte === parteInfo.parte &&
+             jornal.fecha === parteInfo.fecha &&
+             jornal.jornada === parteInfo.jornada;
+    });
+
+    console.log(`✅ ${chapasDelParte.length} chapas encontradas en el parte`);
+
+    loading.classList.add('hidden');
+
+    if (chapasDelParte.length === 0) {
+      content.innerHTML = `
+        <div class="modal-empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+          <h3>No se encontraron chapas</h3>
+          <p>No hay chapas asignadas a este parte.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Agrupar por puesto de contratación
+    const chapasPorPuesto = {};
+    chapasDelParte.forEach(jornal => {
+      const puesto = jornal.puesto || 'Sin puesto asignado';
+      if (!chapasPorPuesto[puesto]) {
+        chapasPorPuesto[puesto] = [];
+      }
+      chapasPorPuesto[puesto].push(jornal.chapa);
+    });
+
+    // Ordenar puestos alfabéticamente
+    const puestosOrdenados = Object.keys(chapasPorPuesto).sort();
+
+    // Renderizar grupos de puestos
+    puestosOrdenados.forEach(puesto => {
+      const chapas = chapasPorPuesto[puesto];
+
+      const puestoGroup = document.createElement('div');
+      puestoGroup.className = 'puesto-group';
+
+      const header = document.createElement('div');
+      header.className = 'puesto-group-header';
+      header.innerHTML = `
+        <h3 class="puesto-group-title">${getEmojiPuesto(puesto)} ${puesto}</h3>
+        <span class="puesto-group-count">${chapas.length} asignacion${chapas.length > 1 ? 'es' : ''}</span>
+      `;
+
+      const grid = document.createElement('div');
+      grid.className = 'chapas-grid';
+
+      // Ordenar chapas numéricamente
+      const chapasOrdenadas = chapas.sort((a, b) => {
+        const numA = parseInt(a) || 0;
+        const numB = parseInt(b) || 0;
+        return numA - numB;
+      });
+
+      chapasOrdenadas.forEach(chapa => {
+        const badge = document.createElement('div');
+        badge.className = 'chapa-badge';
+        badge.innerHTML = `
+          <div class="chapa-numero">${chapa}</div>
+          <div class="chapa-label">Chapa</div>
+        `;
+        grid.appendChild(badge);
+      });
+
+      puestoGroup.appendChild(header);
+      puestoGroup.appendChild(grid);
+      content.appendChild(puestoGroup);
+    });
+
+    // Mostrar resumen total con desglose por puesto
+    const resumen = document.createElement('div');
+    resumen.className = 'modal-resumen-container';
+
+    // Título del resumen
+    const resumenTitulo = document.createElement('div');
+    resumenTitulo.className = 'modal-resumen-titulo';
+    resumenTitulo.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <span>Resumen del Parte</span>
+    `;
+    resumen.appendChild(resumenTitulo);
+
+    // Grid de puestos con su cantidad
+    const resumenGrid = document.createElement('div');
+    resumenGrid.className = 'modal-resumen-grid';
+
+    puestosOrdenados.forEach(puesto => {
+      const cantidad = chapasPorPuesto[puesto].length;
+      const card = document.createElement('div');
+      card.className = 'modal-resumen-card';
+      card.innerHTML = `
+        <div class="modal-resumen-numero">${cantidad}</div>
+        <div class="modal-resumen-puesto">${getEmojiPuesto(puesto)} ${puesto}</div>
+      `;
+      resumenGrid.appendChild(card);
+    });
+
+    resumen.appendChild(resumenGrid);
+
+    // Total general
+    const totalGeneral = document.createElement('div');
+    totalGeneral.className = 'modal-resumen-total';
+    totalGeneral.innerHTML = `
+      <strong>Total:</strong> ${chapasDelParte.length} trabajador${chapasDelParte.length > 1 ? 'es' : ''}
+    `;
+    resumen.appendChild(totalGeneral);
+
+    content.appendChild(resumen);
+
+  } catch (error) {
+    console.error('Error al cargar chapas del parte:', error);
+    loading.classList.add('hidden');
+    content.innerHTML = `
+      <div class="modal-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3>Error al cargar datos</h3>
+        <p>No se pudieron cargar las chapas del parte. Por favor, intenta de nuevo.</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Cierra el modal de chapas del parte
+ */
+function cerrarModalChapas() {
+  const modal = document.getElementById('modal-chapas-parte');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// Event listeners para el modal
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('modal-chapas-parte');
+  const closeBtn = document.getElementById('modal-chapas-close');
+
+  // Cerrar con botón X
+  if (closeBtn) {
+    closeBtn.addEventListener('click', cerrarModalChapas);
+  }
+
+  // Cerrar al hacer click fuera del modal
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        cerrarModalChapas();
+      }
+    });
+  }
+
+  // Cerrar con tecla ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      cerrarModalChapas();
+    }
+  });
+});
 
 /**
  * Carga la página de jornales - Sistema de Quincenas
